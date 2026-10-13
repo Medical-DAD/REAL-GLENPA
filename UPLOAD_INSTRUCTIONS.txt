@@ -1,0 +1,9 @@
+GLENPA REAL iPhone shortcut fix
+
+Cause: the old index.html used /apple-touch-icon.png (site domain root) instead of a relative path for GitHub Pages /REAL-GLENPA/.
+
+Upload the four files index.html, daraldawa-apple-v2.png, daraldawa-icon-192-v2.png, daraldawa-icon-512-v2.png to the ROOT of the REAL-GLENPA GitHub repository using Add file > Upload files. Commit changes and wait for GitHub Actions green check.
+
+Check https://medical-dad.github.io/REAL-GLENPA/daraldawa-apple-v2.png in Safari. The picture should display the Dar Aldawa logo. Then delete the old iPhone bookmark, reopen the main GLENPA REAL URL in Safari and Add to Home Screen.
+
+This bundle is for demonstration use only. Do not enter real patient health data.
