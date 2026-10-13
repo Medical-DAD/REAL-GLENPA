@@ -1,0 +1,8 @@
+GLENPA REAL — Dar Aldawa home-screen icon set
+
+Upload apple-touch-icon.png, icon-192.png and icon-512.png into the SAME folder as index.html on GitHub Pages. Ensure the HTML head contains:
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+
+Commit changes; after GitHub Pages deploys, on your iPhone remove the previous home-screen shortcut and re-add it in Safari via Share → Add to Home Screen. This does not deploy or update dashboard analytics: Dashboard_Specification.md is a design blueprint only.
