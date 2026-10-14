@@ -156,7 +156,8 @@ function clinicsView(){
  const total=current.clinics.reduce((sum,c)=>sum+enrolledInClinic(c.id).length,0);
  const target=current.clinics.length*CLINIC_PATIENT_TARGET;
  const complete=current.clinics.filter(c=>enrolledInClinic(c.id).length>=CLINIC_PATIENT_TARGET).length;
- const summary='<div class="clinic-overview-stats">'+
+ const summary='<div class="actions"><button class="secondary" type="button" id="refreshClinicProgress">'+t('Refresh clinic counts','تحديث أعداد المرضى')+'</button></div>'+ 
+ '<div class="clinic-overview-stats">'+
   metric(t('Total enrolled patients','إجمالي المرضى المسجلين'),total+' / '+target)+
   metric(t('Clinics at target','العيادات التي حققت المستهدف'),complete+' / '+current.clinics.length)+
   metric(t('Target per clinic','المستهدف لكل عيادة'),CLINIC_PATIENT_TARGET)+'</div>'+
@@ -831,6 +832,7 @@ async function handleClick(e){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
   $('view').innerHTML=panel(t('Edit clinic','تعديل العيادة'),'<form id="clinicForm"><input type="hidden" name="code" value="'+esc(c.id)+'"><div class="field-grid"><label>'+t('Doctor','الطبيب')+'<input name="doctorName" value="'+esc(c.doctorName||'')+'" required></label><label>'+t('Specialty','الاختصاص')+'<input name="specialty" value="'+esc(c.specialty||'')+'" required></label><label>'+t('Area','المنطقة')+'<input name="area" value="'+esc(c.area||'')+'" required></label></div><button class="cta" type="submit">'+t('Save changes','حفظ التعديلات')+'</button></form>');return}
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
+ if(e.target.id==='refreshClinicProgress'){if(isAdmin())await safeAction(loadRecords);return}
  if(e.target.id==='downloadClinicXlsx'){if(isAdmin())downloadClinicTemplate();return}
  if(e.target.id==='importClinicWorkbook'){await safeAction(importClinicWorkbook);return}
  if(e.target.id==='newPatientBtn')openEnrollForm();
