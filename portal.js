@@ -41,10 +41,13 @@ function updateLanguage(){
 function setBusy(id,bool){const el=$(id);if(el)el.disabled=bool}
 function errorMessage(err){
  const code=String(err?.code||'');
- if(code.includes('permission-denied'))return t('Database permissions are not enabled. An administrator must deploy the approved Firestore rules before this feature can be used.','صلاحيات قاعدة البيانات غير مفعّلة. يجب نشر قواعد Firestore المعتمدة قبل استخدام هذه الوظيفة.');
- if(code.includes('auth/'))return t('Account credentials were not accepted or this user has not been provisioned.','بيانات الدخول غير صحيحة أو الحساب لم يُفعّل بعد.');
- if(code.includes('unavailable'))return t('Database temporarily unavailable. Please retry.','قاعدة البيانات غير متاحة مؤقتًا. حاول مجددًا.');
- return t('Operation could not be completed.','تعذّر إكمال العملية.')+' '+String(err?.message||'').slice(0,140);
+ if(code==='auth/invalid-credential'||code==='auth/wrong-password'||code==='auth/user-not-found')return t('The Firebase account or password is incorrect. Verify the administrator account linked to msl.admin.','حساب فايربيس أو كلمة مروره غير صحيحة. تأكد من حساب الأدمن المرتبط باسم msl.admin.');
+ if(code==='auth/unauthorized-domain')return t('Add medical-dad.github.io to Firebase Authentication authorized domains.','يجب إضافة medical-dad.github.io إلى النطاقات المسموحة في Firebase Authentication.');
+ if(code==='auth/operation-not-allowed')return t('Enable Email/Password in Firebase Authentication sign-in methods.','يجب تفعيل تسجيل الدخول بالبريد وكلمة المرور في Firebase Authentication.');
+ if(code.includes('permission-denied'))return t('Firestore denied this operation. Confirm published rules and the active user profile.','رفضت Firestore العملية. تأكد من نشر القواعد وصلاحية حساب المستخدم.');
+ if(code.includes('unavailable'))return t('Database temporarily unavailable. Retry.','قاعدة البيانات غير متاحة مؤقتًا. حاول مجددًا.');
+ if(err?.message?.startsWith('No study access profile')||err?.message?.startsWith('Inactive or invalid study access profile'))return t('Firebase login succeeded, but this account has no active study access profile.','تم تسجيل الدخول إلى Firebase، لكن حسابك لا يملك صلاحية دراسة مفعلة.');
+ return t('Could not complete operation.','تعذّر إكمال العملية.')+' '+String(err?.message||'').slice(0,140);
 }
 async function login(username,password,admin){
  const u=parseCode(username);
