@@ -2,6 +2,7 @@
  * Generates valid OOXML ZIP STORE and parses normal Excel ZIP DEFLATE workbooks.
  * Password cells are TEXT to preserve leading zeroes.
  */
+import inflateRaw from './vendor/tiny-inflate.js';
 const headers=['clinicCode','doctorName','specialty','area','username','password'];
 const encoder=new TextEncoder(),decoder=new TextDecoder('utf-8',{fatal:true});
 const xmlEscape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
@@ -91,11 +92,18 @@ async function extractXlsx(file){
   let decoded;
   if(method===0)decoded=payload;
   else if(method===8){
-   if(typeof DecompressionStream==='undefined')throw Error('This browser cannot read compressed Excel files');
-   const stream=new Blob([payload]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-   decoded=new Uint8Array(await new Response(stream).arrayBuffer());
+   // Some mobile browsers lack deflate-raw. Keep ZIP decoding entirely local and offline.
+   let nativeDecoder=null;
+   if(typeof DecompressionStream!=='undefined'){
+    try{nativeDecoder=new DecompressionStream('deflate-raw')}catch(_){}
+   }
+   if(nativeDecoder){
+    const stream=new Blob([payload]).stream().pipeThrough(nativeDecoder);
+    decoded=new Uint8Array(await new Response(stream).arrayBuffer());
+   }else decoded=inflateRaw(payload,new Uint8Array(uncompressed));
   }else throw Error('Unsupported Excel compression method');
   if(decoded.length!==uncompressed)throw Error('Invalid Excel worksheet size');
+  if(crc32(decoded)!==read32(data,p-(46+nlen+extra+comment)+16))throw Error('Excel worksheet integrity check failed');
   result[name]=decoder.decode(decoded);
  }
  if(!result['xl/worksheets/sheet1.xml'])throw Error('Workbook has no first worksheet');
