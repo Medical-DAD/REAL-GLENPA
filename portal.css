@@ -9,3 +9,37 @@
 .install-btn{border:0;background:linear-gradient(110deg,#35beac,#74dfbe);padding:11px 13px;color:#062d37;border-radius:11px;font-weight:850}
 .install-x{border:0;background:#ffffff23;color:#fff;border-radius:8px;padding:4px 9px;font-size:20px}
 @media(min-width:820px){.install-invite{display:none!important}}
+
+/* Structured coded-patient profile and three-stage visit timeline. */
+.clinical-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:11px;margin:14px 0 23px}
+.clinical-kv>div,.clinical-fact{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:13px;min-width:0;word-break:break-word}
+.clinical-kv small,.clinical-fact span{display:block;color:var(--sub);font-size:12px;font-weight:650;margin-bottom:5px}
+.clinical-kv strong,.clinical-fact strong{display:block;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.medications-table{min-width:520px}
+.field-label{display:block;color:var(--text);font-size:13px;font-weight:800;margin:10px 0}
+.diagnosis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:9px}
+.diagnosis-option{border:1px solid var(--line);background:var(--bg);border-radius:11px;padding:11px;display:flex;align-items:center;gap:9px;margin:0;cursor:pointer;font-size:12px}
+.diagnosis-option:has(input:checked){border-color:var(--primary);background:var(--pale)}
+.diagnosis-option input{appearance:auto;min-height:18px;width:18px;flex-shrink:0;accent-color:var(--primary);margin:0}
+.diagnosis-option span{margin:0;display:block}
+.visit-history{display:grid;gap:13px;margin:18px 0}
+.visit-card{border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--card);overflow:hidden}
+.visit-card.completed{border-inline-start:4px solid var(--primary2)}
+.visit-card.pending{border-inline-start:4px solid var(--line)}
+.visit-title-line{display:flex;align-items:center;gap:13px;list-style:none;margin:0;min-height:53px}
+details.visit-card summary{cursor:pointer}
+details.visit-card summary::-webkit-details-marker{display:none}
+details.visit-card summary:focus-visible{outline:2px solid var(--primary);outline-offset:4px}
+.visit-title-line>div{flex:1;min-width:0}
+.visit-title-line strong{display:block;font-size:15px}
+.visit-step{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;flex-shrink:0;background:var(--pale);color:var(--primary);font-weight:850;font-size:19px}
+.visit-status{background:var(--pale);border-radius:50px;padding:5px 11px;color:var(--primary);font-size:11px;font-weight:750;white-space:nowrap}
+.visit-card.pending .visit-status{color:var(--sub);background:var(--bg)}
+.visit-card.pending .cta{margin-top:17px}
+.visit-content{padding:12px 0 0 53px}
+[dir=rtl] .visit-content{padding:12px 53px 0 0}
+.visit-notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px;margin-top:13px}
+.visit-notes>div{border-top:1px solid var(--line);padding-top:12px}
+.visit-notes b{font-size:12px;color:var(--primary)}
+.visit-notes p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0 8px}
+@media(max-width:600px){.visit-card{padding:13px}.visit-title-line{gap:9px}.visit-step{width:33px;height:33px}.visit-title-line strong{font-size:13px}.visit-status{font-size:10px;padding:4px 7px}.visit-content{padding:12px 0 0}[dir=rtl] .visit-content{padding:12px 0 0}.diagnosis-grid{grid-template-columns:1fr}}
