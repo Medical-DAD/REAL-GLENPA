@@ -143,7 +143,7 @@ export async function readClinicTemplate(file){
   if(values.some(v=>String(v).trim()))rows.push(values.map(v=>String(v).trim()));
   if(rows.length>60)throw Error('Excel file contains too many rows');
  }
- if(!rows.length||rows[0].join('|')!==headers.join('|'))throw Error('Excel headers must be clinicCode, doctorName, specialty, area, username, password');
+ if(!rows.length||rows[0].join('|')!==headers.join('|'))throw Error('Excel headers must be clinicCode, doctorName, specialty, area, username, password. Found: '+JSON.stringify(rows[0]||[]).slice(0,200));
  return rows.slice(1).filter(r=>r.some(v=>v!=='')&&r.slice(1).some(Boolean)).map((values,index)=>
   Object.fromEntries(headers.map((h,i)=>[h,values[i]||''])));
 }
