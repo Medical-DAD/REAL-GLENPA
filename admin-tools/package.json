@@ -1,0 +1,11 @@
+{
+  "name": "glenpa-real-private-admin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "check": "node --check manage.cjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
