@@ -31,7 +31,7 @@ function rowXml(values,rowIndex){
  return '<row r="'+rowIndex+'">'+values.map((value,col)=>{
   if(value===null||value===undefined||value==='')return '';
   const addr=String.fromCharCode(65+col)+rowIndex;
-  return '<c r="'+addr+'" s="1" t="inlineStr"><is><t>'+xmlEscape(value)+'</t></is></c>';
+  return '<c r="'+addr+'" s="'+(rowIndex===1?0:1)+'" t="inlineStr"><is><t>'+xmlEscape(value)+'</t></is></c>';
  }).join('')+'</row>';
 }
 export function clinicTemplateBlob(){
