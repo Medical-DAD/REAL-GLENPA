@@ -143,7 +143,7 @@ function qrView(){
  return panel(t('Website QR code','رمز QR للموقع'),
  '<p class="muted">'+t('Download a high-resolution card linking to the study portal.','نزّل بطاقة عالية الدقة تحتوي على رابط بوابة الدراسة.')+'</p>'+
  '<div id="qrContainer" class="hidden"></div><canvas id="qrCanvas" class="qr-card" width="960" height="1220"></canvas>'+
- '<p class="url">'+WEB_URL+'</p><button class="cta" id="downloadQR">'+t('Download Premium PNG','تنزيل صورة PNG فاخرة')+'</button>');
+ '<p class="url">'+WEB_URL+'</p><button class="cta" id="downloadQR" disabled>'+t('Download Premium PNG','تنزيل صورة PNG فاخرة')+'</button>');
 }
 function accountView(){
  return panel(t('Account details','بيانات الحساب'),
@@ -161,6 +161,7 @@ function contactView(){
 }
 function renderQR(){
  const c=$('qrCanvas');if(!c)return;
+ const button=$('downloadQR');if(button)button.disabled=true;
  const ctx=c.getContext('2d');const gradient=ctx.createLinearGradient(0,0,960,1220);gradient.addColorStop(0,'#132e46');gradient.addColorStop(.7,'#1a6f73');gradient.addColorStop(1,'#1f9c88');
  ctx.fillStyle=gradient;ctx.fillRect(0,0,960,1220);ctx.textAlign='center';
  ctx.fillStyle='#fff';ctx.font='bold 57px system-ui';ctx.fillText('GLENPA REAL',480,125);
@@ -174,7 +175,7 @@ function renderQR(){
  setTimeout(()=>{
    const matrix=holder.querySelector('canvas')||holder.querySelector('img');
    if(!matrix)return;
-   try{ctx.drawImage(matrix,160,282,640,640)}catch(err){status(t('QR preview unavailable','معاينة QR غير متاحة'),'error')}
+   try{ctx.drawImage(matrix,160,282,640,640);if(button)button.disabled=false}catch(err){status(t('QR preview unavailable','معاينة QR غير متاحة'),'error')}
  },90);
  ctx.fillStyle='#fff';ctx.font='bold 42px system-ui';ctx.fillText('SCAN TO OPEN',480,1060);
  ctx.font='25px system-ui';ctx.fillText('medical-dad.github.io/REAL-GLENPA',480,1120);
