@@ -1,0 +1,34 @@
+
+/* GLENPA REAL Admin Studio • Almarai typography and responsive workspace */
+html[lang="ar"],html[lang="ar"] body,html[lang="ar"] button,html[lang="ar"] input,html[lang="ar"] select,html[lang="ar"] textarea,html[lang="ar"] option,[dir="rtl"]{font-family:'Almarai',Tahoma,Arial,sans-serif!important}
+.siteadm{display:grid;gap:18px}.adm-lead{background:linear-gradient(115deg,#142e46,#17685f);border-radius:22px;padding:25px;color:white;box-shadow:0 18px 35px #112e4524}
+.adm-lead h2{color:#fff!important;font-size:clamp(21px,3vw,30px);margin:7px 0}.adm-lead p{color:#dcefeb;max-width:750px;margin:5px 0}
+.adm-badge{display:inline-flex;gap:8px;align-items:center;padding:6px 11px;border:1px solid #b5eddf65;border-radius:999px;font-size:11px;color:#b8eae0;font-weight:850;letter-spacing:.04em}
+.adm-tabs{display:flex;flex-wrap:wrap;gap:8px;padding:9px;background:var(--card);border:1px solid var(--line);border-radius:16px}
+.adm-tab{flex:1 1 auto;min-width:105px;border-radius:11px!important;min-height:43px;background:transparent!important;color:var(--text)!important;font-weight:760;border:1px solid transparent!important}
+.adm-tab.active{color:#fff!important;background:var(--primary)!important}.adm-tab:hover:not(.active){background:var(--pale)!important}
+.adm-surface{border-radius:20px;background:var(--card);padding:22px;border:1px solid var(--line);box-shadow:0 8px 22px #142f420c}
+.adm-surface h3{color:var(--text)!important;font-size:19px;margin:0 0 7px}.adm-surface>p{color:var(--sub)}
+.adm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px}
+.adm-field{display:grid;gap:6px;color:var(--text);font-weight:700;font-size:12px}
+.adm-field input,.adm-field select{width:100%;max-width:100%;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:11px;padding:12px}
+.adm-cta{border:0!important;border-radius:11px!important;background:var(--primary)!important;color:white!important;padding:11px 18px!important;font-weight:800}
+.adm-ghost{background:var(--pale)!important;color:var(--primary)!important;border:1px solid var(--line)!important}
+.adm-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:17px 0}
+.adm-notice{padding:13px 15px;border-radius:12px;background:var(--pale);color:var(--text);border:1px solid var(--line);font-size:13px;line-height:1.75}
+.adm-alert{padding:13px 15px;border-radius:12px;background:#fff2dc;color:#79511b;border:1px solid #efdbb3;font-size:13px;line-height:1.75}
+[data-theme="dark"] .adm-alert{background:#43372a;color:#ffe4b2;border-color:#795a36}
+.adm-table{overflow:auto}.adm-table table{min-width:610px}.adm-table th,.adm-table td{padding:12px 10px}.adm-table td b{color:var(--text)}
+.adm-chip{padding:5px 9px;border-radius:30px;background:var(--pale);font-size:11px;font-weight:750;color:var(--primary)}
+.adm-smallbtn{border-radius:9px!important;padding:7px 9px!important;font-size:12px;font-weight:700}
+.adm-smallbtn:disabled{opacity:.4}
+.adm-help{font-size:12px;color:var(--sub);margin:8px 0}
+.adm-preview{text-align:center;background:#eff7f3;padding:22px;border-radius:22px;border:1px solid #ccded6}
+.adm-preview canvas{display:block;width:min(100%,390px);height:auto;margin:auto;border-radius:17px;box-shadow:0 10px 35px #132b3a22}
+.adm-qrlayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,340px);gap:23px;align-items:center}
+.adm-qrinfo h3{font-size:24px}
+.adm-url{word-break:break-word;color:var(--primary);font-weight:760}
+.adm-secgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.adm-secitem{padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--bg)}.adm-secitem b{display:block;margin-bottom:7px}
+[data-theme="dark"] .adm-preview{background:#28394a;border-color:#40576a}
+@media(max-width:760px){.adm-qrlayout{grid-template-columns:1fr}.adm-surface{padding:14px}.adm-lead{padding:19px}.adm-tab{min-width:42%}}
