@@ -110,8 +110,8 @@ async function extractXlsx(file){
  return result;
 }
 // XML documents may expose childNodes but not Element.children (e.g. some parsers).
-const children=(node,name)=>Array.from(node?.childNodes||[]).filter(x=>
- x.nodeType===1 && (x.localName||x.nodeName?.split(':').pop())===name);
+const localNameOf=node=>String(node?.localName||node?.nodeName||'').split(':').pop();
+const children=(node,name)=>Array.from(node?.childNodes||[]).filter(x=>x.nodeType===1&&localNameOf(x)===name);
 const first=(node,name)=>children(node,name)[0];
 function docXml(input){
  const d=new DOMParser().parseFromString(input,'application/xml');
@@ -122,9 +122,10 @@ export async function readClinicTemplate(file){
  if(!/\.xlsx$/i.test(file?.name||''))throw Error('Please upload a .xlsx Excel file');
  const data=await extractXlsx(file);
  const shared=data['xl/sharedStrings.xml']?children(docXml(data['xl/sharedStrings.xml']).documentElement,'si')
-   .map(si=>Array.from(si.getElementsByTagName('*')).filter(n=>n.localName==='t').map(n=>n.textContent||'').join('')):[];
+   .map(si=>si.textContent||''):[];
  const xml=docXml(data['xl/worksheets/sheet1.xml']);
- const sheetData=Array.from(xml.getElementsByTagName('*')).find(n=>n.localName==='sheetData');
+ const sheetData=Array.from(xml.getElementsByTagName('*')).find(n=>localNameOf(n)==='sheetData');
+ if(!sheetData)throw Error('Excel worksheet is missing row data');
  const rows=[];
  for(const row of children(sheetData,'row')){
   const values=Array(6).fill('');
@@ -136,7 +137,7 @@ export async function readClinicTemplate(file){
    if(type==='e')throw Error('An Excel cell contains an error');
    if(first(cell,'f'))throw Error('Excel formulas are not allowed in clinic credentials');
    values[col]=type==='s'?shared[Number(v?.textContent)]||'':
-    type==='inlineStr'?Array.from(inline?.getElementsByTagName('*')||[]).filter(n=>n.localName==='t').map(n=>n.textContent||'').join(''):
+    type==='inlineStr'?inline?.textContent||'':
     v?.textContent||'';
   }
   if(values.some(v=>String(v).trim()))rows.push(values.map(v=>String(v).trim()));
