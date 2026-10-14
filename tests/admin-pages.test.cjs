@@ -48,7 +48,7 @@ test('premium loader is included on both pages and supports reduced-motion',()=>
 });
 test('admin can remove clinic study access, never remove own administrator identity',()=>{
  assert.ok(app.includes('data-removeuser'));
- assert.ok(app.includes('user.role!==\\'clinic\\'')||app.includes("user.role!=='clinic'"));
+ assert.ok(app.includes("user.role!=='clinic'"));
  assert.ok(app.includes('user.id===current.user.uid'));
  assert.ok(app.includes('window.confirm('));
  assert.ok(app.includes('active:false,removed:true,removedBy:current.user.uid,removedAt:serverTimestamp()'));
