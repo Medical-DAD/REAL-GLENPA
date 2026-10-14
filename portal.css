@@ -75,3 +75,7 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
 .file-button input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
 @keyframes wizard-enter{from{opacity:.5;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:660px){.wizard-actions>*{flex:1 1 auto}.patient-name-hero{padding:16px}.excel-import-card{padding:16px}.file-button{max-width:100%}}
+
+/* Keep Excel progress and per-row errors visible next to the upload controls. */
+#clinicWorkbookStatus{white-space:pre-line;overflow-wrap:anywhere;font-weight:650;min-height:1.3rem}
+#importClinicWorkbook:disabled{opacity:.6;cursor:not-allowed}
