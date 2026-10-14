@@ -31,6 +31,6 @@ jobs:
           node --check excel-lite.js
           node --check admin-tools/manage.cjs
       - name: Set up XML parser for Excel compatibility tests (CI only)
-        run: npm install --no-save --ignore-scripts linkedom@0.18.12
+        run: npm install --no-save --ignore-scripts @xmldom/xmldom@0.9.8
       - name: Validate Spark user-management invariants
         run: node --test tests/spark-users.test.cjs tests/clinical-history.test.cjs tests/excel-upload.test.mjs tests/patient-directory-excel.test.mjs
