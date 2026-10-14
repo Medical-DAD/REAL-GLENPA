@@ -12,7 +12,7 @@ globalThis.fetch=async(url,opt)=>{
   :{ok:true,uid:'u123',profile:{role:'study_oversight'}};
  return {ok:true,status:200,json:async()=>data};
 };
-const api=await import('../../secure-api.js');
+const api=await import('../secure-api.js');
 test('username and password login uses backend session and not Firebase Auth',async()=>{
  let user=null;await api.initializeSession(u=>{user=u});
  assert.equal(user,null);
