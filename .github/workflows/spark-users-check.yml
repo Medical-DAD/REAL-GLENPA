@@ -1,0 +1,25 @@
+name: Spark User Management Checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'portal.js'
+      - 'index.html'
+      - 'admin-tools/**'
+      - 'tests/spark-users.test.cjs'
+      - '.github/workflows/spark-users-check.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate syntax
+        run: |
+          node --check portal.js
+          node --check admin-tools/manage.cjs
+      - name: Validate Spark user-management invariants
+        run: node --test tests/spark-users.test.cjs
