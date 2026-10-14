@@ -11,7 +11,16 @@
 <link rel="stylesheet" href="./portal.css?v=20261014-clinic-oversight-20-v1">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script type="module" src="./portal.js?v=20261014-clinic-oversight-20-v1"></script>
-</head><body>
+</head><body data-portal="clinic">
+<div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-label="Loading GLENPA REAL">
+ <div class="page-loader-content">
+  <div class="loader-mark"><img src="./apple-touch-icon.png" alt="" width="62" height="62"><span class="loader-orbit loader-orbit-one"></span><span class="loader-orbit loader-orbit-two"></span></div>
+  <strong>GLENPA <em>REAL</em></strong>
+  <span class="loader-subtitle">MEDICAL AFFAIRS · STUDY PORTAL</span>
+  <div class="loader-progress" aria-hidden="true"><span></span></div>
+  <p id="loaderMessage">Connecting securely to your study workspace…</p>
+ </div>
+</div>
 <header class="topbar"><button id="brand" class="brand" type="button" aria-label="GLENPA REAL"><img src="./apple-touch-icon.png" alt="" width="42" height="42"><span><strong>GLENPA <em>REAL</em></strong><small>MEDICAL AFFAIRS · STUDY PORTAL</small></span></button>
 <div class="toptools"><button id="theme" class="quiet" type="button" title="Change theme">◑</button><button id="language" class="quiet" type="button">العربية</button><button id="signout" class="quiet hidden" type="button">Sign out</button></div></header>
 <aside id="installInvite" class="install-invite hidden" aria-label="Install GLENPA REAL">
@@ -24,7 +33,7 @@
 <main id="workspace" class="shell">
 <div id="globalStatus" class="notice hidden" role="status" aria-live="polite"></div>
 <section id="authScreen" class="auth-layout">
-<div class="welcome"><span class="eyebrow">GLENPA REAL · REAL-WORLD EVIDENCE</span><h1 id="welcomeTitle">Clinical study, connected.</h1><p id="welcomeDesc">Secure site access for participating clinics. Visits and records are synchronized through the study database.</p><div class="welcome-metrics"><div><b>26</b><span id="metricClinics">Participating clinics</span></div><div><b>03</b><span id="metricVisits">Study visits</span></div></div></div>
+<div class="welcome"><span class="eyebrow">GLENPA REAL · REAL-WORLD EVIDENCE</span><h1 id="welcomeTitle">Clinical study, connected.</h1><p id="welcomeDesc">Secure site access for participating clinics. Visits and records are synchronized through the study database.</p></div>
 <form id="loginForm" class="panel auth-form"><div class="eyebrow teal">SECURE ACCESS</div><h2 id="loginTitle">Login</h2><p id="loginDesc" class="muted">Access your assigned study workspace.</p>
 <label><span id="usernameLabel">Username</span><input id="username" autocomplete="username" required placeholder="clinic01" maxlength="40"></label>
 <label><span id="passwordLabel">Password</span><input id="password" type="password" autocomplete="current-password" required></label>
@@ -37,10 +46,4 @@
 </section>
 <footer>GLENPA REAL · DAR ALDAWA · MEDICAL AFFAIRS</footer>
 </main>
-<div id="adminOverlay" class="overlay hidden" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
-<button type="button" id="closeAdmin" class="modal-close" aria-label="Close">×</button><span class="secret-icon">✦</span><p class="eyebrow teal">PRIVATE ADMINISTRATOR ACCESS</p><h2 id="adminTitle">Administrator Access</h2>
-<form id="adminLoginForm"><label><span id="adminUsernameLabel">Username</span><input value="msl.admin" readonly id="adminUsername" autocomplete="username"></label>
-<label><span id="adminPasswordLabel">Password</span><input id="adminPassword" type="password" required autocomplete="current-password"></label>
-<button id="adminLoginButton" class="cta" type="submit">Access dashboard →</button><p id="adminMessage" class="form-status" role="status"></p></form>
-</div></div>
 </body></html>
