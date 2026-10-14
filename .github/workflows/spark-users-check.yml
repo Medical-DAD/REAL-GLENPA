@@ -9,6 +9,9 @@ on:
       - 'tests/patient-directory-excel.test.mjs'
       - 'firestore.rules'
       - 'tests/clinical-history.test.cjs'
+      - 'tests/excel-upload.test.mjs'
+      - 'excel-lite.js'
+      - 'vendor/**'
       - 'index.html'
       - 'admin-tools/**'
       - 'tests/spark-users.test.cjs'
@@ -27,5 +30,7 @@ jobs:
           node --check portal.js
           node --check excel-lite.js
           node --check admin-tools/manage.cjs
+      - name: Set up XML parser for Excel compatibility tests (CI only)
+        run: npm install --no-save --ignore-scripts linkedom@0.18.12
       - name: Validate Spark user-management invariants
-        run: node --test tests/spark-users.test.cjs tests/clinical-history.test.cjs tests/patient-directory-excel.test.mjs
+        run: node --test tests/spark-users.test.cjs tests/clinical-history.test.cjs tests/excel-upload.test.mjs tests/patient-directory-excel.test.mjs
