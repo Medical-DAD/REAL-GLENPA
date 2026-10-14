@@ -87,7 +87,18 @@ service cloud.firestore {
       allow get: if admin() || sameClinic(clinicId);
       allow list: if admin();
       allow create: if admin()
-        && clinicId.matches('^clinic(0[1-9]|1[0-9]|2[0-6])
+        && clinicId.matches('^clinic(0[1-9]|1[0-9]|2[0-6])$')
+        && request.resource.data.keys().hasOnly(['doctorName','specialty','area'])
+        && request.resource.data.keys().hasAll(['doctorName','specialty','area'])
+        && request.resource.data.doctorName is string
+        && request.resource.data.doctorName.size() > 0
+        && request.resource.data.doctorName.size() <= 100
+        && request.resource.data.specialty is string
+        && request.resource.data.specialty.size() > 0
+        && request.resource.data.specialty.size() <= 80
+        && request.resource.data.area is string
+        && request.resource.data.area.size() > 0
+        && request.resource.data.area.size() <= 80;
       allow update: if admin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doctorName','specialty','area'])
         && request.resource.data.doctorName is string
