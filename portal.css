@@ -101,3 +101,33 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
  .clinic-detail-hero{padding:16px;align-items:flex-start}
  .clinic-detail-count{min-width:95px}
 }
+
+/* GLENPA REAL signature loader: accessible branded motion with graceful reduced-motion fallback */
+.page-loader{
+ position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
+ background:radial-gradient(circle at 12% 14%,rgba(58,204,167,.11),transparent 38%),
+            radial-gradient(circle at 90% 85%,rgba(10,108,122,.08),transparent 42%),
+            linear-gradient(140deg,#f5faf4 0%,#fefdf1 55%,#eaf6f0 100%);
+ backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+ opacity:1;visibility:visible;transition:opacity .42s ease,visibility .42s ease;
+}
+.page-loader.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
+.page-loader-content{display:flex;flex-direction:column;align-items:center;text-align:center;width:min(340px,90vw);padding:32px 15px}
+.loader-mark{height:126px;width:126px;display:grid;place-items:center;position:relative;margin-bottom:22px}
+.loader-mark::before{content:"";width:106px;height:106px;border-radius:32px;transform:rotate(-9deg);position:absolute;
+ background:linear-gradient(145deg,#ffffffee,#d8eee9c7);border:1px solid #e3f1ed;box-shadow:0 25px 65px #176d6940}
+.loader-mark img{position:relative;z-index:2;object-fit:contain;filter:drop-shadow(0 4px 8px #268c8030)}
+.loader-orbit{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;pointer-events:none}
+.loader-orbit-one{border-top-color:#298a88;border-right-color:#54bfa8;animation:loader-spin 2.5s linear infinite}
+.loader-orbit-two{inset:11px;border-bottom-color:#73ccae;border-left-color:#237179;animation:loader-spin 3.1s linear infinite reverse}
+.page-loader-content>strong{font-size:clamp(27px,5vw,34px);color:#163f4a;font-weight:900;letter-spacing:-.045em;line-height:1.15}
+.page-loader-content>strong em{font-style:normal;color:#2fa78d}
+.loader-subtitle{color:#547783;font-size:10px;font-weight:750;letter-spacing:.18em;margin-top:7px}
+.loader-progress{width:168px;height:5px;border-radius:20px;background:#d5e8e1;margin-top:33px;overflow:hidden}
+.loader-progress span{width:45%;height:100%;display:block;border-radius:20px;background:linear-gradient(90deg,#218587,#5ccba7);
+ animation:loader-slide 1.4s cubic-bezier(.65,.05,.35,.95) infinite}
+#loaderMessage{font-size:12px;line-height:1.7;color:#617985;margin:17px 0 0;font-weight:650}
+@keyframes loader-spin{to{transform:rotate(360deg)}}
+@keyframes loader-slide{0%{transform:translateX(-115%)}100%{transform:translateX(330%)}}
+[data-portal="admin"] .welcome{background:linear-gradient(135deg,#112d3a,#175960 62%,#157979)}
+@media(prefers-reduced-motion:reduce){.loader-orbit,.loader-progress span{animation:none}.page-loader{transition:none}}
