@@ -6,7 +6,7 @@ import{firebaseConfig}from'./firebase-config.js';
 
 const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
 const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
-const CLINIC_AUTH_DOMAIN='glenpa-real.example.com';
+
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
 const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
@@ -18,7 +18,7 @@ const isClinic=()=>current.profile?.role==='clinic';
 const isAuthorized=()=>current.user&&current.profile?.active===true&&(isAdmin()||isClinic());
 const parseCode=s=>String(s||'').toLowerCase().trim();
 const validClinic=s=>/^clinic(0[1-9]|1[0-9]|2[0-6])$/.test(s);
-const emailForUsername=u=>u==='msl.admin'?ADMIN_EMAIL:u+'@'+CLINIC_AUTH_DOMAIN;
+async function emailForUsername(u){if(u==='msl.admin')return ADMIN_EMAIL;const handle=await getDoc(doc(db,'loginHandles',u));if(!handle.exists())throw Error('Account has not been provisioned.');return handle.data().email;}
 function escapeCsv(x){let v=String(x??'');if(/^[\s]*[=+@-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}
 function status(message,kind){current.alert=message;const el=$('globalStatus');el.textContent=message;el.classList.toggle('hidden',!message);el.classList.toggle('critical',kind==='error')}
 function settingsTheme(){try{current.theme=localStorage.getItem('glenpa-theme')||'blue'}catch(e){}document.documentElement.dataset.theme=current.theme}
@@ -51,7 +51,7 @@ async function login(username,password,admin){
  if(admin&&u!=='msl.admin')throw Error('Invalid administrator username');
  if(!admin&&(!/^[a-z0-9._-]{3,40}$/.test(u)||u==='msl.admin'))throw Error('Invalid clinic username');
  await setPersistence(auth,browserSessionPersistence);
- await signInWithEmailAndPassword(auth,emailForUsername(u),password);
+ await signInWithEmailAndPassword(auth,await emailForUsername(u),password);
 }
 function renderNav(){
  const links=isAdmin()?[
@@ -123,7 +123,7 @@ function usersView(){
  '<p class="muted">'+t('Create clinic logins with username and password. Passwords are handled by Firebase Authentication; only non-secret roles are saved to Firestore.','أنشئ حسابات العيادات بأسماء مستخدمين وكلمات مرور. تُدار كلمات المرور في Firebase Authentication وتُحفظ الأدوار غير السرية فقط في Firestore.')+'</p>'+
  '<form id="createUserForm"><div class="field-grid"><label>'+t('Username','اسم المستخدم')+'<input name="username" placeholder="clinic01" pattern="[a-zA-Z0-9._-]{3,40}" required></label>'+
  '<label>'+t('Clinic','العيادة')+'<select name="clinicCode" required>'+current.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.id+' · '+(c.doctorName||''))+'</option>').join('')+'</select></label>'+
- '<label>'+t('New account password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+'<input type="password" name="password" required minlength="14" autocomplete="new-password"></label></div>'+
+ '<label>'+t('Login email (not shown on clinic login)','البريد المرتبط بالحساب (لا يظهر بصفحة دخول العيادة)')+'<input type="email" name="email" autocomplete="email" required></label>'+'<label>'+t('New account password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+'<input type="password" name="password" required minlength="14" autocomplete="new-password"></label></div>'+
  '<div class="actions"><button class="cta" type="submit">'+t('Create clinic account','إنشاء حساب العيادة')+'</button></div></form>'+
  '<p class="help">'+t('Use dedicated study passwords. Do not reuse historical demonstration credentials. Password resets for other users require an approved privileged backend or self-service workflow.','استخدم كلمات مرور جديدة ومخصصة للدراسة. لا تستخدم كلمات المرور التجريبية السابقة. إعادة تعيين كلمة مرور مستخدم آخر تتطلب خدمة خلفية مخوّلة أو آلية ذاتية.')+'</p>'+
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
@@ -254,15 +254,19 @@ function openVisitForm(patient){
 }
 async function provisionUser(form){
  if(!isAdmin())throw Error('Not authorized');
- const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||'');
- if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||password.length<14)throw Error('Invalid account data');
- const second=initializeApp(firebaseConfig,'provision-'+Date.now());const secondAuth=getAuth(second);
+ const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||''),email=String(f.get('email')||'').trim().toLowerCase();
+ if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||password.length<14||!email.includes('@'))throw Error('Invalid account data');
+ const existing=await getDoc(doc(db,'loginHandles',username));
+ if(existing.exists())throw Error('Username already exists');
+ const second=initializeApp(firebaseConfig,'provision-'+Date.now()),secondAuth=getAuth(second);
  let user=null;
  try{
-  const signed=await createUserWithEmailAndPassword(secondAuth,emailForUsername(username),password);
+  const signed=await createUserWithEmailAndPassword(secondAuth,email,password);
   user=signed.user;
-  await setDoc(doc(db,'userProfiles',user.uid),{username,role:'clinic',clinicCode,active:true,createdBy:current.user.uid,createdAt:serverTimestamp()});
-  await signOut(secondAuth);
+  const batch=writeBatch(db);
+  batch.set(doc(db,'userProfiles',user.uid),{username,role:'clinic',clinicCode,active:true,createdBy:current.user.uid,createdAt:serverTimestamp()});
+  batch.set(doc(db,'loginHandles',username),{email,userUid:user.uid});
+  await batch.commit();await signOut(secondAuth);
  }catch(e){
   if(user)try{await deleteUser(user)}catch(cleanup){}
   throw e;
