@@ -285,6 +285,23 @@ async function loadRecords(){
 function eligiblePatientWrite(patient){
  return isClinic()&&patient.clinicCode===clinicKey();
 }
+function getVisitValues(form,phase){
+ const f=new FormData(form),date=String(f.get('date')||'').trim();
+ const hba1c=Number(f.get('hba1c')),fpg=Number(f.get('fpg'));
+ const egfr=f.get('egfr')===''?null:Number(f.get('egfr'));
+ const weight=f.get('weight')===''?null:Number(f.get('weight'));
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date+'T12:00:00Z')))throw Error(t('Enter a valid visit date.','أدخل تاريخ زيارة صحيحًا.'));
+ if(!Number.isFinite(hba1c)||hba1c<3||hba1c>20||!Number.isFinite(fpg)||fpg<30||fpg>1000||
+ (egfr!==null&&(!Number.isFinite(egfr)||egfr<0||egfr>200))||
+ (weight!==null&&(!Number.isFinite(weight)||weight<1||weight>400)))throw Error(t('Check clinical measurements and units.','تحقق من القياسات السريرية ووحداتها.'));
+ const dose=String(f.get('dose')||'');
+ if(!['10/5 mg','25/5 mg'].includes(dose))throw Error('Invalid Glenpa strength');
+ const value=k=>String(f.get(k)||'').trim().slice(0,400);
+ return {phase,date,hba1c,fpg,egfr,weight,dose,
+  adverseEvent:value('adverseEvent'),medicationChanges:value('medicationChanges'),
+  diagnosis:value('diagnosis'),notes:value('notes'),
+  updatedBy:current.user.uid,updatedAt:serverTimestamp()};
+}
 async function enrollPatient(form){
  if(!isClinic()||current.settings.enrollmentEnabled!==true)throw Error(t('Enrollment is disabled.','تسجيل المرضى متوقف حاليًا.'));
  const f=new FormData(form),id=String(f.get('patientCode')||'').trim().toUpperCase();
@@ -295,14 +312,19 @@ async function enrollPatient(form){
  if(medical.history.length>1500||medical.otherDiagnoses.length>500||medical.medications.length>1600)throw Error(t('Clinical text exceeds permitted limits.','النص السريري أطول من الحد المسموح.'));
  const clinicCode=clinicKey(),patientId=clinicCode+'_'+id;
  if((await getDoc(doc(db,'patients',patientId))).exists())throw Error(t('Study ID already exists.','رمز هذا المريض مسجّل مسبقًا.'));
- const payload={
-  clinicCode,patientCode:id,age,sex:String(f.get('sex')),diabetesYears,...medical,
-  createdBy:current.user.uid,createdAt:serverTimestamp()
- };
- await setDoc(doc(db,'patients',patientId),payload);
+ const baseline=getVisitValues(form,'baseline');
+ const payload={clinicCode,patientCode:id,age,sex:String(f.get('sex')),diabetesYears,...medical,
+  createdBy:current.user.uid,createdAt:serverTimestamp()};
+ // Atomic write: both the patient profile and baseline must succeed together.
+ const batch=writeBatch(db);
+ batch.set(doc(db,'patients',patientId),payload);
+ batch.set(doc(db,'patients',patientId,'visits','baseline'),baseline);
+ await batch.commit();
  current.patient=patientId;current.view='patients';
  await loadRecords();
- status(t('Patient profile saved. Record Baseline as the first study visit.','تم حفظ ملف المريض. سجّل الآن زيارة Baseline كأول زيارة.'));
+ const patient=current.patients.find(p=>p.id===patientId);
+ if(patient){render();await showVisits(patient)}
+ status(t('Patient and Baseline visit saved together.','تم حفظ المريض وزيارة Baseline معًا.'));
 }
 async function updateMedicalProfile(form,patient){
  if(!eligiblePatientWrite(patient))throw Error(t('Only the assigned clinic may edit medical history.','العيادة المسؤولة فقط يمكنها تعديل التاريخ المرضي.'));
@@ -315,43 +337,24 @@ async function updateMedicalProfile(form,patient){
 }
 
 async function saveVisit(form,patient){
- if(!eligiblePatientWrite(patient))throw Error(t('Only the assigned clinic may record a visit.','العيادة المسؤولة فقط يمكنها تسجيل زيارة.'));
- const f=new FormData(form),phase=String(f.get('phase'));
- if(!VISIT_PHASES.includes(phase))throw Error(t('Invalid visit type.','نوع الزيارة غير صحيح.'));
- const visitRef=doc(db,'patients',patient.id,'visits',phase);
- if((await getDoc(visitRef)).exists())throw Error(t('This visit is already recorded and cannot be overwritten.','هذه الزيارة مسجّلة سابقًا ولا يمكن استبدالها.'));
- const hba1c=Number(f.get('hba1c')),fpg=Number(f.get('fpg'));
- const egfr=f.get('egfr')===''?null:Number(f.get('egfr'));
- const weight=f.get('weight')===''?null:Number(f.get('weight'));
- if(!Number.isFinite(hba1c)||hba1c<3||hba1c>20||!Number.isFinite(fpg)||fpg<30||fpg>1000||
- (egfr!==null&&(!Number.isFinite(egfr)||egfr<0||egfr>200))||
- (weight!==null&&(!Number.isFinite(weight)||weight<1||weight>400)))throw Error(t('Check the entered laboratory and weight values.','راجع قيم التحاليل والوزن المدخلة.'));
- const date=String(f.get('date'));
- if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(new Date(date+'T12:00:00Z').valueOf()))throw Error(t('Enter a valid visit date.','أدخل تاريخ زيارة صحيحًا.'));
- const previous=phase==='month3'?'baseline':phase==='month6'?'month3':null;
+ if(!eligiblePatientWrite(patient))throw Error('Visit writing not authorized');
+ const phase=String(new FormData(form).get('phase')||'');
+ if(!VISIT_PHASES.includes(phase))throw Error('Invalid phase');
+ const prior=phase==='month3'?'baseline':phase==='month6'?'month3':null;
+ const existing=await getDocs(collection(db,'patients',patient.id,'visits'));
+ if(existing.docs.some(v=>v.id===phase))throw Error(t('This visit has already been saved.','هذه الزيارة مسجّلة مسبقًا.'));
+ const previous=prior?existing.docs.find(v=>v.id===prior):null;
+ if(prior&&!previous)throw Error(t('Save the previous visit first.','يجب حفظ الزيارة السابقة أولًا.'));
+ const visit=getVisitValues(form,phase);
  if(previous){
-  const snap=await getDoc(doc(db,'patients',patient.id,'visits',previous));
-  if(!snap.exists())throw Error(t('Record the previous scheduled visit first.','سجّل الزيارة السابقة أولًا.'));
-  const previousDate=new Date(snap.data().date+'T12:00:00Z');
-  if(Number.isNaN(previousDate.valueOf()))throw Error(t('The previous visit date is invalid.','تاريخ الزيارة السابقة غير صحيح.'));
-  previousDate.setUTCMonth(previousDate.getUTCMonth()+3);
-  if(date<previousDate.toISOString().slice(0,10))throw Error(t('Follow-up visits require at least 3 calendar months after the previous visit.','زيارة المتابعة تتطلب 3 أشهر تقويمية على الأقل بعد الزيارة السابقة.'));
+  const prevDate=new Date(previous.data().date+'T12:00:00Z');
+  if(Number.isNaN(prevDate.valueOf()))throw Error('Invalid previous visit date');
+  prevDate.setUTCMonth(prevDate.getUTCMonth()+3);
+  if(visit.date<prevDate.toISOString().slice(0,10))throw Error(t('Follow-up is due at least 3 calendar months after the previous visit.','تُسجل المتابعة بعد 3 أشهر تقويمية على الأقل من الزيارة السابقة.'));
  }
- const payload={
-  phase,date,hba1c,fpg,egfr,weight,dose:String(f.get('dose')),
-  adverseEvent:String(f.get('adverseEvent')||'').trim().slice(0,400),
-  medicationChanges:String(f.get('medicationChanges')||'').trim().slice(0,400),
-  diagnosis:String(f.get('diagnosis')||'').trim().slice(0,400),
-  notes:String(f.get('notes')||'').trim().slice(0,400),
-  updatedBy:current.user.uid,updatedAt:serverTimestamp()
- };
- await setDoc(visitRef,payload);
- current.view='patients';current.patient=patient.id;
- render();
- status(t('Visit saved. The complete record is now in patient history.','تم حفظ الزيارة، وتفاصيلها موجودة الآن في سجل المريض.'));
-}
-function clinicalFact(label,value,suffix=''){
- return '<div class="clinical-fact"><span>'+label+'</span><strong>'+showValue(value)+(value!==null&&value!==undefined&&String(value)!==''?suffix:'')+'</strong></div>';
+ await setDoc(doc(db,'patients',patient.id,'visits',phase),visit);
+ render();await showVisits(patient);
+ status(t('Visit saved in the patient history.','تم حفظ الزيارة في سجل المريض.'));
 }
 async function showVisits(patient){
  const container=$('visitsArea');
