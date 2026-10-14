@@ -1,0 +1,26 @@
+name: Secure Study Login Checks
+on:
+  push:
+    branches: ['feature/secure-username-auth']
+  pull_request:
+    paths:
+      - 'functions/**'
+      - 'secure-api.js'
+      - 'portal.js'
+      - 'index.html'
+jobs:
+  auth-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          node --check functions/index.js
+          node --check functions/passwords.js
+          node --check portal.js
+          node --check secure-api.js
+      - name: Unit and session tests
+        run: node --test functions/test/*.test.js tests/*.test.mjs
