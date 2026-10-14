@@ -71,6 +71,7 @@ function render(){
  $('sectionSub').textContent=isAdmin()?t('Authorized medical affairs workspace','مساحة الإشراف الطبي المخوّلة'):
    (current.clinics.find(c=>c.id===clinicKey())?.doctorName||clinicKey());
  $('roleBadge').textContent=isAdmin()?t('Study administrator','مسؤول الدراسة'):t('Clinic account','حساب العيادة');
+ if(!current.ready){$('view').innerHTML=panel(t('Connecting to study database','جارٍ الاتصال بقاعدة بيانات الدراسة'),'<p>'+t('Clinical functions remain unavailable until the database permission checks complete.','تبقى الوظائف السريرية غير متاحة حتى يكتمل التحقق من صلاحيات قاعدة البيانات.')+'</p>');return;}
  const views={overview:overview,clinics:clinicsView,patients:patientsView,users:usersView,settings:settingsView,qr:qrView,account:accountView};
  $('view').innerHTML=(views[current.view]||overview)();
  if(current.view==='qr')setTimeout(renderQR,0);
@@ -213,7 +214,18 @@ async function saveVisit(form,patient){
  const weight=f.get('weight')===''?null:Number(f.get('weight'));
  if(hba1c<3||hba1c>20||!Number.isFinite(hba1c)||fpg<30||fpg>1000||!Number.isFinite(fpg)||
  (egfr!==null&&(!Number.isFinite(egfr)||egfr<0||egfr>200))||(weight!==null&&(!Number.isFinite(weight)||weight<1||weight>400)))throw Error('Invalid laboratory values');
- const payload={phase,date:String(f.get('date')),hba1c,fpg,egfr,weight,dose:String(f.get('dose')),
+ const date=String(f.get('date'));
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Invalid visit date');
+ if(phase!=='baseline'){
+  const previous=phase==='month3'?'baseline':'month3';
+  const snap=await getDoc(doc(db,'patients',patient.id,'visits',previous));
+  if(!snap.exists())throw Error('Record the preceding visit first');
+  const previousDate=new Date(snap.data().date+'T12:00:00Z');
+  if(Number.isNaN(previousDate.valueOf()))throw Error('Invalid previous visit date');
+  previousDate.setUTCMonth(previousDate.getUTCMonth()+3);
+  if(date<previousDate.toISOString().slice(0,10))throw Error('At least 3 calendar months must separate study visits.');
+ }
+ const payload={phase,date,hba1c,fpg,egfr,weight,dose:String(f.get('dose')),
  adverseEvent:String(f.get('adverseEvent')||'').slice(0,400),medicationChanges:String(f.get('medicationChanges')||'').slice(0,400),
  notes:String(f.get('notes')||'').slice(0,400),updatedBy:current.user.uid,updatedAt:serverTimestamp()};
  await setDoc(doc(db,'patients',patient.id,'visits',phase),payload);
@@ -279,12 +291,20 @@ async function updateSettings(form){
  await setDoc(doc(db,'siteSettings','main'),data,{merge:true});
  await loadRecords();status(t('Study settings saved.','تم حفظ إعدادات الدراسة.'));
 }
-function exportCodedCSV(){
- const cols=['clinicCode','patientCode','age','sex','diabetesYears'];
- const rows=[cols].concat(current.patients.map(p=>cols.map(k=>p[k]??'')));
+async function exportCodedCSV(){
+ const cols=['clinicCode','patientCode','age','sex','diabetesYears','visit','visitDate','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges'];
+ const rows=[cols];const all=current.patients;
+ for(const p of all){
+  const visits=await getDocs(collection(db,'patients',p.id,'visits'));
+  if(visits.empty){rows.push([p.clinicCode,p.patientCode,p.age,p.sex,p.diabetesYears,'','','','','','','','','']);continue}
+  for(const v of visits.docs){
+   const d=v.data();
+   rows.push([p.clinicCode,p.patientCode,p.age,p.sex,p.diabetesYears,v.id,d.date,d.hba1c,d.fpg,d.egfr,d.weight,d.dose,d.adverseEvent,d.medicationChanges]);
+  }
+ }
  const csv=rows.map(row=>row.map(escapeCsv).join(',')).join('\r\n');
  const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
- const a=document.createElement('a');a.href=url;a.download='GLENPA-REAL-Coded-Patients.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const a=document.createElement('a');a.href=url;a.download='GLENPA-REAL-Coded-Visits.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function downloadQR(){
  const canvas=$('qrCanvas');if(!canvas||typeof window.QRCode==='undefined')return status(t('QR generator is unavailable.','مولّد QR غير متاح.'),'error');
@@ -304,7 +324,7 @@ async function handleClick(e){
  if(e.target.id==='newPatientBtn')openEnrollForm();
  if(e.target.id==='newVisitBtn'){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p)}
  if(e.target.id==='backPatients'){current.patient=null;render()}
- if(e.target.id==='exportCsvBtn')exportCodedCSV();
+ if(e.target.id==='exportCsvBtn')await safeAction(exportCodedCSV);
  if(e.target.id==='downloadQR')downloadQR();
 }
 $('view').addEventListener('click',handleClick);
