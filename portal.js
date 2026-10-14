@@ -201,7 +201,7 @@ async function loadRecords(){
  }
 }
 function eligiblePatientWrite(patient){
- return isClinic()&&current.settings.enrollmentEnabled===true&&patient.clinicCode===clinicKey();
+ return isClinic()&&patient.clinicCode===clinicKey();
 }
 async function enrollPatient(form){
  if(!isClinic()||current.settings.enrollmentEnabled!==true)throw Error('Enrollment not authorized');
