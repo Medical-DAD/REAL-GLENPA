@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function profilePath() {
+      return /databases/$(database)/documents/userProfiles/$(request.auth.uid);
+    }
+    function hasProfile() {
+      return signedIn() && exists(profilePath());
+    }
+    function active() {
+      return hasProfile() && get(profilePath()).data.active == true;
+    }
+    function admin() {
+      return active() && get(profilePath()).data.role == 'study_oversight';
+    }
+    function clinic() {
+      return active() && get(profilePath()).data.role == 'clinic';
+    }
+    function myClinic() {
+      return get(profilePath()).data.clinicCode;
+    }
+    function sameClinic(code) {
+      return clinic() && myClinic() == code;
+    }
+    function patientPath(id) {
+      return /databases/$(database)/documents/patients/$(id);
+    }
+    // The username lookup is a single-document public read, never a list.
+    // Only administrators can create mappings, which are paired with a profile.
+    match /loginHandles/{username} {
+      allow get: if username.matches('^[a-z0-9._-]{3,40}$');
+      allow list: if false;
+      allow create: if admin()
+        && request.resource.data.keys().hasOnly(['email', 'userUid'])
+        && request.resource.data.keys().hasAll(['email', 'userUid'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.userUid is string
+        && getAfter(/databases/$(database)/documents/userProfiles/$(request.resource.data.userUid)).data.username == username;
+      allow update, delete: if false;
+    }
+
+    match /userProfiles/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId || admin();
+      allow list: if admin();
+      allow create: if admin()
+        && request.resource.data.keys().hasOnly(['username','role','clinicCode','active','createdBy','createdAt'])
+        && request.resource.data.keys().hasAll(['username','role','clinicCode','active','createdBy','createdAt'])
+        && request.resource.data.role == 'clinic'
+        && request.resource.data.active == true
+        && request.resource.data.clinicCode.matches('^clinic(0[1-9]|1[0-9]|2[0-6])$')
+        && request.resource.data.username.matches('^[a-z0-9._-]{3,40}$')
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update: if admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
+        && request.resource.data.active is bool;
+      allow delete: if false;
+    }
+
+    match /clinics/{clinicId} {
+      allow get: if admin() || sameClinic(clinicId);
+      allow list: if admin();
+      allow create: if false; // initial roster is provisioned in the Firebase console.
+      allow update: if admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doctorName','specialty','area'])
+        && request.resource.data.doctorName is string
+        && request.resource.data.doctorName.size() <= 100
+        && request.resource.data.specialty is string
+        && request.resource.data.specialty.size() <= 80
+        && request.resource.data.area is string
+        && request.resource.data.area.size() <= 80;
+      allow delete: if false;
+    }
+
+    match /siteSettings/{settingId} {
+      allow get: if active();
+      allow list: if false;
+      allow create: if admin() && settingId == 'main'
+        && request.resource.data.keys().hasOnly(['studyTitle','enrollmentEnabled','updatedBy','updatedAt'])
+        && request.resource.data.studyTitle is string
+        && request.resource.data.studyTitle.size() <= 90
+        && request.resource.data.enrollmentEnabled is bool
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow update: if admin() && settingId == 'main'
+        && request.resource.data.keys().hasOnly(['studyTitle','enrollmentEnabled','updatedBy','updatedAt'])
+        && request.resource.data.studyTitle is string
+        && request.resource.data.studyTitle.size() <= 90
+        && request.resource.data.enrollmentEnabled is bool
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /patients/{patientId} {
+      allow get, list: if admin() || sameClinic(resource.data.clinicCode);
+      allow create: if clinic()
+        && request.resource.data.keys().hasOnly(['clinicCode','patientCode','age','sex','diabetesYears','createdBy','createdAt'])
+        && request.resource.data.keys().hasAll(['clinicCode','patientCode','age','sex','diabetesYears','createdBy','createdAt'])
+        && request.resource.data.clinicCode == myClinic()
+        && request.resource.data.patientCode.matches('^[A-Z0-9_-]{3,24}$')
+        && patientId == request.resource.data.clinicCode + '_' + request.resource.data.patientCode
+        && request.resource.data.age is int
+        && request.resource.data.age >= 18
+        && request.resource.data.age <= 110
+        && request.resource.data.sex in ['Male','Female']
+        && request.resource.data.diabetesYears is number
+        && request.resource.data.diabetesYears >= 0
+        && request.resource.data.diabetesYears <= 100
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+
+      match /visits/{visitId} {
+        allow get, list: if admin()
+          || (clinic() && get(patientPath(patientId)).data.clinicCode == myClinic());
+        allow create: if clinic()
+          && get(patientPath(patientId)).data.clinicCode == myClinic()
+          && visitId in ['baseline','month3','month6']
+          && request.resource.data.keys().hasOnly(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','notes','updatedBy','updatedAt'])
+          && request.resource.data.keys().hasAll(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','notes','updatedBy','updatedAt'])
+          && request.resource.data.phase == visitId
+          && request.resource.data.date is string
+          && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.resource.data.hba1c is number
+          && request.resource.data.hba1c >= 3
+          && request.resource.data.hba1c <= 20
+          && request.resource.data.fpg is number
+          && request.resource.data.fpg >= 30
+          && request.resource.data.fpg <= 1000
+          && (request.resource.data.egfr == null || request.resource.data.egfr is number && request.resource.data.egfr >= 0 && request.resource.data.egfr <= 200)
+          && (request.resource.data.weight == null || request.resource.data.weight is number && request.resource.data.weight >= 1 && request.resource.data.weight <= 400)
+          && request.resource.data.dose in ['10/5 mg','25/5 mg']
+          && request.resource.data.adverseEvent is string
+          && request.resource.data.adverseEvent.size() <= 400
+          && request.resource.data.medicationChanges is string
+          && request.resource.data.medicationChanges.size() <= 400
+          && request.resource.data.notes is string
+          && request.resource.data.notes.size() <= 400
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
