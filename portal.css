@@ -131,3 +131,12 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
 @keyframes loader-slide{0%{transform:translateX(-115%)}100%{transform:translateX(330%)}}
 [data-portal="admin"] .welcome{background:linear-gradient(135deg,#112d3a,#175960 62%,#157979)}
 @media(prefers-reduced-motion:reduce){.loader-orbit,.loader-progress span{animation:none}.page-loader{transition:none}}
+
+/* Transparent clinic account removal action */
+.user-row-actions{display:flex;align-items:center;gap:13px;flex-wrap:wrap;min-width:175px}
+.link.destructive{color:var(--error);font-weight:850}
+.link.destructive:hover{text-decoration:underline}
+.removed-users{border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-top:20px;background:var(--pale)}
+.removed-users summary{cursor:pointer;font-weight:850;color:var(--text)}
+.removed-users .help{margin-top:12px}
+.removed-user-list{display:flex;gap:9px;flex-wrap:wrap;margin-top:11px}
