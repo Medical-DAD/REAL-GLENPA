@@ -13,7 +13,7 @@ const INTERNAL_CLINIC_DOMAIN='glenpa-real.firebaseapp.com';
 
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
-const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,visitDocs:new Map(),patientNames:new Map(),settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
+const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,visitDocs:new Map(),patientNames:new Map(),nameDirectoryReady:false,bulkRows:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,ar)=>current.language==='ar'?ar:en;
 const isAdmin=()=>current.profile?.role==='study_oversight';
@@ -168,17 +168,18 @@ function patientName(p){
 }
 const normalizeSearch=value=>String(value||'').normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g,'').toLocaleLowerCase().trim().replace(/\s+/g,' ');
 function patientsView(){
- const enrollment=isClinic()&&current.settings.enrollmentEnabled===true;
+ const enrollment=isClinic()&&current.settings.enrollmentEnabled===true&&current.nameDirectoryReady;
  const myList=isAdmin()?current.patients:current.patients.filter(p=>p.clinicCode===clinicKey());
  const patient=current.patient&&myList.find(x=>x.id===current.patient);
  if(patient)return patientView(patient);
  const search=isClinic()?'<label class="patient-search">'+t('Search patients by first and last name','ابحث عن المريض بالاسم الأول واسم العائلة')+
  '<input id="patientSearch" type="search" autocomplete="off" placeholder="'+t('Type the patient name…','اكتب اسم المريض…')+'"></label>':'';
+ const directoryNotice=isClinic()&&!current.nameDirectoryReady?'<div class="notice">'+t('Patient names are not available yet. Publish the updated Firestore Security Rules before adding named patients.','دليل أسماء المرضى غير متاح بعد. انشر قواعد Firestore الجديدة قبل تسجيل مرضى بأسمائهم.')+'</div>':'';
  const heading='<div class="row"><p class="muted">'+t('Clinic staff can search patient names. Study reporting remains coded.','العيادة تستطيع البحث باسم المريض، بينما تبقى بيانات الدراسة مرمّزة.')+'</p>'+
  '<div class="actions">'+(enrollment?'<button class="cta" id="newPatientBtn">'+t('+ Enroll patient','+ تسجيل مريض')+'</button>':'')+
  '<button class="secondary" id="exportCsvBtn">'+t('Export coded study data','تصدير بيانات الدراسة المرمّزة')+'</button></div></div>';
  const notice=isClinic()&&!enrollment?'<div class="notice">'+t('New enrollment is currently disabled.','تسجيل المرضى الجدد متوقف حاليًا.')+'</div>':'';
- return panel(t('Patient registry','سجل المرضى'),heading+notice+search+
+ return panel(t('Patient registry','سجل المرضى'),heading+notice+directoryNotice+search+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Patient','المريض')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Age / Sex','العمر / الجنس')+'</th><th>'+t('Diabetes years','سنوات السكري')+'</th><th>'+t('History','السجل')+'</th></tr></thead><tbody>'+
  myList.map(p=>'<tr class="patient-list-row" data-patient-search="'+esc(normalizeSearch(patientName(p)+' '+p.patientCode))+'">'+
  '<td><b>'+esc(patientName(p))+'</b>'+(isClinic()?'<small class="subtle-id">'+t('Study reference','رمز الدراسة')+': '+esc(p.patientCode)+'</small>':'')+'</td>'+
@@ -208,7 +209,7 @@ function patientView(p){
  return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+t('← Back to patient registry','← الرجوع إلى سجل المرضى')+'</button></div>'+ 
  (fullName?'<div class="patient-name-hero"><h2>'+esc(fullName.firstName+' '+fullName.lastName)+'</h2><small>'+t('Internal study reference','الرمز الداخلي للدراسة')+': '+esc(p.patientCode)+'</small></div>':
  '<div class="patient-name-hero"><h2>'+t('Patient name not recorded','اسم المريض غير مسجل')+'</h2><small>'+esc(p.patientCode)+'</small></div>')+
- (canWrite?'<div class="actions"><button class="secondary" id="editPatientName">'+t(fullName?'Correct patient name':'Add patient name',fullName?'تصحيح اسم المريض':'إضافة اسم المريض')+'</button></div>':'')+
+ (canWrite&&current.nameDirectoryReady?'<div class="actions"><button class="secondary" id="editPatientName">'+t(fullName?'Correct patient name':'Add patient name',fullName?'تصحيح اسم المريض':'إضافة اسم المريض')+'</button></div>':'')+
  '<div class="grid">'+metric(t('Coded study ID','رمز المريض'),esc(p.patientCode))+
  metric(t('Age','العمر'),esc(p.age))+
  metric(t('Recorded study visits','الزيارات المسجّلة'),'<span id="patientVisitCount">…</span>')+'</div>'+
@@ -298,9 +299,15 @@ async function loadRecords(){
   const ps=isAdmin()?await getDocs(collection(db,'patients')):await getDocs(query(collection(db,'patients'),where('clinicCode','==',clinicKey())));
   current.patients=ps.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
   if(isClinic()){
-   const directory=await getDocs(query(collection(db,'patientDirectory'),where('clinicCode','==',clinicKey())));
-   current.patientNames=new Map(directory.docs.map(d=>[d.id,d.data()]));
-  }else current.patientNames=new Map();
+   try{
+    const directory=await getDocs(query(collection(db,'patientDirectory'),where('clinicCode','==',clinicKey())));
+    current.patientNames=new Map(directory.docs.map(d=>[d.id,d.data()]));
+    current.nameDirectoryReady=true;
+   }catch(error){
+    // Keep existing coded study pages usable while the user manually publishes updated rules.
+    current.patientNames=new Map();current.nameDirectoryReady=false;
+   }
+  }else{current.patientNames=new Map();current.nameDirectoryReady=false;}
   try{const settings=await getDoc(doc(db,'siteSettings','main'));current.settings=settings.exists()?settings.data():{studyTitle:'GLENPA REAL',enrollmentEnabled:false}}catch(e){current.settings={studyTitle:'GLENPA REAL',enrollmentEnabled:false}}
   if(isAdmin()){
    const users=await getDocs(collection(db,'userProfiles'));current.users=users.docs.map(d=>({id:d.id,...d.data()}));
@@ -333,7 +340,7 @@ function getVisitValues(form,phase){
   updatedBy:current.user.uid,updatedAt:serverTimestamp()};
 }
 async function enrollPatient(form){
- if(!isClinic()||current.settings.enrollmentEnabled!==true)throw Error(t('Enrollment is disabled.','تسجيل المرضى متوقف حاليًا.'));
+ if(!isClinic()||current.settings.enrollmentEnabled!==true||!current.nameDirectoryReady)throw Error(t('Enrollment is disabled until the clinic name-directory rules are published.','تسجيل المريض غير متاح قبل نشر قواعد دليل أسماء المرضى في Firebase.'));
  const f=new FormData(form);
  const firstName=String(f.get('firstName')||'').trim();
  const lastName=String(f.get('lastName')||'').trim();
