@@ -1,0 +1,13 @@
+{
+  "name": "glenpa-real-study-backend",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {"node": "22"},
+  "main": "index.js",
+  "scripts": {"start": "node index.js", "check": "node --check index.js", "test": "node --test test/*.test.js"},
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}
