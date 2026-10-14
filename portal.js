@@ -12,7 +12,7 @@ const INTERNAL_CLINIC_DOMAIN='glenpa-real.firebaseapp.com';
 
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
-const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
+const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,visitDocs:new Map(),settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,ar)=>current.language==='ar'?ar:en;
 const isAdmin=()=>current.profile?.role==='study_oversight';
@@ -496,15 +496,17 @@ async function safeAction(job){
  try{await job()}catch(e){status(errorMessage(e),'error')}finally{current.busy=false}
 }
 async function handleClick(e){
- const nav=e.target.closest('[data-nav]');if(nav){current.view=nav.dataset.nav;current.patient=null;render();return}
- const patientBtn=e.target.closest('[data-patient]');if(patientBtn){current.patient=patientBtn.dataset.patient;current.view='patients';render();const patient=current.patients.find(x=>x.id===current.patient);if(patient)await showVisits(patient);return}
+ const nav=e.target.closest('[data-nav]');if(nav){current.view=nav.dataset.nav;current.patient=null;current.visitDocs=new Map();render();return}
+ const patientBtn=e.target.closest('[data-patient]');if(patientBtn){current.patient=patientBtn.dataset.patient;current.visitDocs=new Map();current.view='patients';render();return}
  const editBtn=e.target.closest('[data-editclinic]');if(editBtn){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
   $('view').innerHTML=panel(t('Edit clinic','تعديل العيادة'),'<form id="clinicForm"><input type="hidden" name="code" value="'+esc(c.id)+'"><div class="field-grid"><label>'+t('Doctor','الطبيب')+'<input name="doctorName" value="'+esc(c.doctorName||'')+'" required></label><label>'+t('Specialty','الاختصاص')+'<input name="specialty" value="'+esc(c.specialty||'')+'" required></label><label>'+t('Area','المنطقة')+'<input name="area" value="'+esc(c.area||'')+'" required></label></div><button class="cta" type="submit">'+t('Save changes','حفظ التعديلات')+'</button></form>');return}
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
  if(e.target.id==='newPatientBtn')openEnrollForm();
- if(e.target.id==='newVisitBtn'){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p)}
- if(e.target.id==='backPatients'){current.patient=null;render()}
+ if(e.target.id==='editMedicalProfile'){const p=current.patients.find(x=>x.id===current.patient);if(p)openMedicalProfileForm(p)}
+ const nextVisit=e.target.closest('[data-addvisit]');
+ if(nextVisit){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p,nextVisit.dataset.addvisit)}
+ if(e.target.id==='backPatients'){current.patient=null;current.visitDocs=new Map();render()}
  if(e.target.id==='exportCsvBtn')await safeAction(exportCodedCSV);
  if(e.target.id==='downloadQR')downloadQR();
 }
@@ -516,6 +518,7 @@ $('view').addEventListener('submit',e=>{
  safeAction(async()=>{
   if(form.id==='enrollForm')await enrollPatient(form);
   else if(form.id==='visitForm'){const p=current.patients.find(x=>x.id===current.patient);if(p)await saveVisit(form,p)}
+  else if(form.id==='medicalProfileForm'){const p=current.patients.find(x=>x.id===current.patient);if(p)await updateMedicalProfile(form,p)}
   else if(form.id==='createUserForm')await provisionUser(form);
   else if(form.id==='settingsForm')await updateSettings(form);
   else if(form.id==='clinicForm'){
