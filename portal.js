@@ -83,6 +83,7 @@ function render(){
  const views={overview:overview,clinics:clinicsView,patients:patientsView,users:usersView,settings:settingsView,qr:qrView,account:accountView,contact:contactView};
  $('view').innerHTML=(views[current.view]||overview)();
  if(current.view==='qr')setTimeout(renderQR,0);
+ if(current.view==='patients'&&current.patient){const p=current.patients.find(x=>x.id===current.patient);if(p)showVisits(p)}
 }
 function panel(title,body){return '<section class="panel"><h2>'+title+'</h2>'+body+'</section>'}
 function metric(title,value){return '<article class="metric"><small>'+title+'</small><b class="tabular">'+value+'</b></article>'}
@@ -102,6 +103,64 @@ function clinicsView(){
  current.clinics.map(c=>'<tr><td>'+esc(c.id)+'</td><td><b>'+esc(c.doctorName||c.name||'')+'</b></td><td>'+esc(c.specialty||'')+'</td><td>'+esc(c.area||'')+'</td><td><button class="link" data-editclinic="'+esc(c.id)+'">'+t('Edit','تعديل')+'</button></td></tr>').join('')+
  '</tbody></table></div>');
 }
+// Clinical profile fields mirror the original GLENPA REAL baseline form.
+// No patient names or other direct identifiers are collected.
+const COMORBIDITIES=[
+ ['Hypertension','ارتفاع ضغط الدم'],
+ ['Dyslipidemia','اضطراب شحميات الدم'],
+ ['Chronic kidney disease','مرض الكلى المزمن'],
+ ['Coronary artery disease','مرض الشريان التاجي'],
+ ['Heart failure','قصور القلب'],
+ ['Obesity','السمنة'],
+ ['Hypothyroidism','قصور الغدة الدرقية'],
+ ['Atrial fibrillation','الرجفان الأذيني'],
+ ['Peripheral arterial disease','مرض الشرايين المحيطية'],
+ ['Stroke or TIA','السكتة الدماغية أو النوبة الإقفارية العابرة'],
+ ['Chronic liver disease','مرض الكبد المزمن'],
+ ['Chronic obstructive pulmonary disease','داء الانسداد الرئوي المزمن'],
+ ['Asthma','الربو'],
+ ['Other','أخرى']
+];
+const VISIT_PHASES=['baseline','month3','month6'];
+const visitLabel=phase=>({baseline:t('Baseline · Visit 1','الزيارة الأساسية · Baseline'),month3:t('Follow-up 1 · Month 3','المتابعة الأولى · الشهر الثالث'),month6:t('Follow-up 2 · Month 6','المتابعة الثانية · الشهر السادس')})[phase]||phase;
+const showValue=value=>value===undefined||value===null||String(value).trim()===''?t('Not recorded','غير مسجّل'):esc(value);
+const labelComorbidity=value=>{const pair=COMORBIDITIES.find(c=>c[0]===value);return pair?t(pair[0],pair[1]):esc(value)};
+function medicationLines(p){
+ if(Array.isArray(p.medications))return p.medications.map(m=>typeof m==='string'?m:[m.name,m.dose,m.frequency,m.status].filter(Boolean).join(' | ')).join('\n');
+ return String(p.medications||'');
+}
+function medicationTable(value){
+ const lines=String(value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).slice(0,25);
+ if(!lines.length)return '<p class="muted">'+t('No baseline medications entered.','لم تُسجل أدوية أساسية بعد.')+'</p>';
+ return '<div class="table-scroll"><table class="medications-table"><thead><tr><th>'+t('Medicine','الدواء')+'</th><th>'+t('Dose','الجرعة')+'</th><th>'+t('Frequency','التكرار')+'</th><th>'+t('Status','الحالة')+'</th></tr></thead><tbody>'+
+ lines.map(line=>{const a=line.split('|').map(s=>s.trim());return '<tr>'+Array.from({length:4},(_,i)=>'<td>'+showValue(a[i])+'</td>').join('')+'</tr>'}).join('')+'</tbody></table></div>';
+}
+function diagnosisSelector(selected=[]){
+ return '<div class="diagnosis-grid">'+COMORBIDITIES.map(([en,ar])=>
+  '<label class="diagnosis-option"><input type="checkbox" name="diagnoses" value="'+esc(en)+'" '+(selected.includes(en)?'checked':'')+'><span>'+t(en,ar)+'</span></label>'
+ ).join('')+'</div>';
+}
+function medicalFields(p={}){
+ const diagnoses=Array.isArray(p.diagnoses)?p.diagnoses:[];
+ return '<div class="field-grid">'+
+ '<label class="span2">'+t('Medical history','التاريخ المرضي')+'<textarea name="history" maxlength="1500" rows="3" placeholder="'+t('Coded clinical background only, no names or contact information','تاريخ مرضي دون أسماء أو بيانات تواصل')+'">'+esc(p.history||'')+'</textarea></label>'+
+ '<div class="span2"><span class="field-label">'+t('Comorbidities (select all applicable)','الأمراض المصاحبة (اختر جميع الحالات)')+'</span>'+diagnosisSelector(diagnoses)+'</div>'+
+ '<label class="span2">'+t('Other comorbidities (specify)','أمراض مصاحبة أخرى (حدّد)')+'<input name="otherDiagnoses" maxlength="500" value="'+esc(p.otherDiagnoses||'')+'"></label>'+
+ '<label class="span2">'+t('Concomitant medications · medicine | dose | frequency | status (one per line)','الأدوية المصاحبة · الدواء | الجرعة | التكرار | الحالة (سطر لكل دواء)')+
+ '<textarea name="medications" maxlength="1600" rows="5" placeholder="Metformin | 1000 mg | Twice daily | Ongoing">'+esc(medicationLines(p))+'</textarea></label></div>'+
+ '<p class="help">'+t('Do not enter names, national IDs, phone numbers or other direct patient identifiers.','يرجى عدم إدخال أسماء أو أرقام وطنية أو هواتف أو أي معرفات شخصية مباشرة.')+'</p>';
+}
+function readMedicalFields(form){
+ const f=new FormData(form);
+ const diagnoses=f.getAll('diagnoses').map(String);
+ return {
+  history:String(f.get('history')||'').trim(),
+  diagnoses:COMORBIDITIES.filter(pair=>diagnoses.includes(pair[0])).map(pair=>pair[0]),
+  otherDiagnoses:String(f.get('otherDiagnoses')||'').trim(),
+  medications:String(f.get('medications')||'').trim()
+ };
+}
+
 function patientsView(){
  const enrollment=isClinic()&&current.settings.enrollmentEnabled===true;
  const myList=isAdmin()?current.patients:current.patients.filter(p=>p.clinicCode===clinicKey());
@@ -118,13 +177,27 @@ function patientsView(){
 }
 function patientView(p){
  const canWrite=isClinic()&&p.clinicCode===clinicKey();
- return '<div class="actions"><button class="secondary" id="backPatients">'+t('← Back to registry','← الرجوع للسجل')+'</button></div>'+
- '<div class="grid">'+metric(t('Study ID','رمز المريض'),esc(p.patientCode))+metric(t('Age','العمر'),esc(p.age))+metric(t('Diabetes duration (years)','مدة السكري (بالسنوات)'),esc(p.diabetesYears))+'</div>'+
- panel(t('Clinical visits','الزيارات السريرية'),
- '<p class="muted">'+t('Baseline → Month 3 → Month 6','الزيارة الأساسية ← الشهر الثالث ← الشهر السادس')+'</p>'+
- '<div id="visitsArea">'+t('Loading visits…','جارٍ تحميل الزيارات…')+'</div>'+
- (canWrite?'<div class="actions"><button class="cta" id="newVisitBtn">'+t('Record clinical visit','تسجيل زيارة سريرية')+'</button></div>':'')+
- '<div class="security-note">'+t('Adverse event entry does not replace the formal pharmacovigilance reporting process.','تسجيل الأحداث الضارة هنا لا يحل محل إجراءات الإبلاغ الرسمية لليقظة الدوائية.')+'</div>');
+ const conditions=Array.isArray(p.diagnoses)?p.diagnoses:[];
+ const names=conditions.map(labelComorbidity);
+ if(p.otherDiagnoses)names.push(esc(p.otherDiagnoses));
+ const clinicalProfile=panel(t('Diabetes profile & medical history','ملف السكري والتاريخ المرضي'),
+  '<div class="clinical-kv">'+
+  '<div><small>'+t('Sex','الجنس')+'</small><strong>'+t(p.sex==='Female'?'Female':'Male',p.sex==='Female'?'أنثى':'ذكر')+'</strong></div>'+
+  '<div><small>'+t('Diabetes duration','مدة السكري')+'</small><strong>'+showValue(p.diabetesYears)+' '+t('years','سنة')+'</strong></div>'+
+  '<div><small>'+t('Medical history','التاريخ المرضي')+'</small><strong>'+showValue(p.history)+'</strong></div>'+
+  '<div><small>'+t('Comorbidities','الأمراض المصاحبة')+'</small><strong>'+(names.length?names.join('، '):t('Not recorded','غير مسجّلة'))+'</strong></div>'+
+  '</div><h3>'+t('Baseline concomitant medications','الأدوية المصاحبة الأساسية')+'</h3>'+
+  medicationTable(medicationLines(p))+
+  (canWrite?'<div class="actions"><button class="secondary" type="button" id="editMedicalProfile">'+t('Edit medical profile','تعديل التاريخ المرضي والأدوية')+'</button></div>':''));
+ return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+t('← Back to patient registry','← الرجوع إلى سجل المرضى')+'</button></div>'+
+ '<div class="grid">'+metric(t('Coded study ID','رمز المريض'),esc(p.patientCode))+
+ metric(t('Age','العمر'),esc(p.age))+
+ metric(t('Recorded study visits','الزيارات المسجّلة'),'<span id="patientVisitCount">…</span>')+'</div>'+
+ clinicalProfile+
+ panel(t('Visit history · Baseline & follow-ups','سجل الزيارات · Baseline والمتابعات'),
+ '<p class="muted">'+t('Open each visit to review its clinical values, therapy changes, newly diagnosed diseases, adverse events and notes.','افتح أي زيارة لمراجعة نتائجها السريرية وتغييرات الأدوية والتشخيصات الجديدة والأحداث الضارة والملاحظات.')+'</p>'+
+ '<div id="visitsArea" class="visit-history">'+t('Loading patient visit history…','جارٍ تحميل سجل زيارات المريض…')+'</div>'+
+ '<div class="security-note">'+t('Safety entries here do not replace formal pharmacovigilance reporting.','تسجيل الأحداث الضارة هنا لا يحل محل إجراءات الإبلاغ الرسمية لليقظة الدوائية.')+'</div>');
 }
 function usersView(){
  if(!isAdmin())return '';
