@@ -398,7 +398,7 @@ async function showVisits(patient){
 }
 function openEnrollForm(){
  const markup='<form id="enrollForm">'+
- '<div class="notice">'+t('Use a coded study ID only. After saving, open Baseline in this patient’s visit history.','استخدم رمز الدراسة فقط. بعد الحفظ افتح زيارة Baseline في سجل المريض.')+'</div>'+
+ '<div class="notice">'+t('Use a coded study ID only. Baseline is saved automatically when you register a new patient.','استخدم رمز الدراسة فقط. عند تسجيل المريض تُحفظ زيارة Baseline تلقائيًا.')+'</div>'+
  '<h3>'+t('Diabetes demographics','بيانات مريض السكري')+'</h3>'+
  '<div class="field-grid"><label>'+t('Unique study ID','رمز الدراسة المميز')+'<input name="patientCode" placeholder="CL01-001" maxlength="24" pattern="[A-Za-z0-9_-]{3,24}" required></label>'+
  '<label>'+t('Age','العمر')+'<input name="age" type="number" min="18" max="110" required></label>'+
@@ -406,7 +406,19 @@ function openEnrollForm(){
  '<label>'+t('Years since type 2 diabetes diagnosis','سنوات الإصابة بالسكري من النوع الثاني')+'<input name="diabetesYears" type="number" min="0" max="100" step="1" required></label></div>'+
  '<h3>'+t('Medical history · Comorbidities · Medication','التاريخ المرضي · الأمراض المصاحبة · الأدوية')+'</h3>'+
  medicalFields()+
- '<div class="actions"><button class="cta" type="submit">'+t('Save patient and open visit history','حفظ المريض وفتح سجل الزيارات')+'</button>'+
+ '<h3>'+t('Baseline · Visit 1 (saved automatically)','الزيارة الأساسية · الزيارة الأولى (تُحفظ تلقائيًا)')+'</h3>'+
+ '<p class="muted">'+t('Complete the first visit details now. Saving the form creates the patient and Baseline together.','سجّل تفاصيل الزيارة الأولى الآن. حفظ النموذج يُنشئ المريض وزيارة Baseline معًا.')+'</p>'+
+ '<div class="field-grid"><label>'+t('Baseline visit date','تاريخ الزيارة الأساسية')+'<input type="date" name="date" required></label>'+
+ '<label>HbA1c (%)<input type="number" min="3" max="20" step="0.1" name="hba1c" required></label>'+
+ '<label>'+t('Fasting glucose (mg/dL)','السكر الصائم (ملغم/دل)')+'<input type="number" min="30" max="1000" step="1" name="fpg" required></label>'+
+ '<label>eGFR (mL/min/1.73m²)<input type="number" min="0" max="200" step="0.1" name="egfr"></label>'+
+ '<label>'+t('Weight (kg)','الوزن (كغم)')+'<input type="number" min="1" max="400" step="0.1" name="weight"></label>'+
+ '<label>'+t('Glenpa strength','تركيز جلينبا')+'<select name="dose"><option value="10/5 mg">10/5 mg</option><option value="25/5 mg">25/5 mg</option></select></label>'+
+ '<label class="span2">'+t('Adverse events','الأحداث الضارة')+'<textarea name="adverseEvent" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('Baseline medication reconciliation / changes','مراجعة الأدوية أو التغييرات عند الزيارة الأساسية')+'<textarea name="medicationChanges" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('New diagnoses / comorbidities','التشخيصات أو الأمراض المصاحبة الجديدة')+'<textarea name="diagnosis" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('Baseline visit notes','ملاحظات الزيارة الأساسية')+'<textarea name="notes" maxlength="400" rows="2"></textarea></label></div>'+
+ '<div class="actions"><button class="cta" type="submit">'+t('Save patient + Baseline visit','حفظ المريض وزيارة Baseline')+'</button>'+
  '<button class="secondary" type="button" data-nav="patients">'+t('Cancel','إلغاء')+'</button></div></form>';
  $('view').innerHTML=panel(t('New patient · Diabetes profile','مريض جديد · ملف السكري'),markup);
 }
