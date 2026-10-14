@@ -719,6 +719,14 @@ async function handleClick(e){
 // Navigation buttons live OUTSIDE #view. Without this listener every top tab is inert.
 $('nav').addEventListener('click',handleClick);
 $('view').addEventListener('click',handleClick);
+$('view').addEventListener('keydown',e=>{
+ if(e.key!=='Enter'||e.shiftKey||e.target.tagName==='TEXTAREA')return;
+ const form=e.target.closest('#enrollForm');
+ if(form&&wizardStep(form)<2){
+  e.preventDefault();
+  nextWizardStep(form);
+ }
+});
 $('view').addEventListener('change',e=>{
  if(e.target.id!=='clinicWorkbookFile'||!isAdmin())return;
  const file=e.target.files?.[0];if(!file)return;
