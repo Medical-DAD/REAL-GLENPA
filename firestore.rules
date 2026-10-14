@@ -123,6 +123,8 @@ service cloud.firestore {
       allow create: if clinic()
         && exists(/databases/$(database)/documents/siteSettings/main)
         && get(/databases/$(database)/documents/siteSettings/main).data.enrollmentEnabled == true
+        && existsAfter(/databases/$(database)/documents/patients/$(patientId)/visits/baseline)
+        && getAfter(/databases/$(database)/documents/patients/$(patientId)/visits/baseline).data.phase == 'baseline'
         && request.resource.data.keys().hasOnly(['clinicCode','patientCode','age','sex','diabetesYears','history','diagnoses','otherDiagnoses','medications','createdBy','createdAt'])
         && request.resource.data.keys().hasAll(['clinicCode','patientCode','age','sex','diabetesYears','history','diagnoses','otherDiagnoses','medications','createdBy','createdAt'])
         && validMedicalProfile(request.resource.data)
@@ -153,7 +155,7 @@ service cloud.firestore {
         allow get, list: if admin()
           || (clinic() && get(patientPath(patientId)).data.clinicCode == myClinic());
         allow create: if clinic()
-          && get(patientPath(patientId)).data.clinicCode == myClinic()
+          && getAfter(patientPath(patientId)).data.clinicCode == myClinic()
           && visitId in ['baseline','month3','month6']
           && previousVisitExists(patientId,visitId)
           && request.resource.data.keys().hasOnly(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','diagnosis','notes','updatedBy','updatedAt'])
