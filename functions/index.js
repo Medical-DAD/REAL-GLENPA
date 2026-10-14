@@ -148,9 +148,8 @@ app.post('/session',asyncRoute(async(req,res)=>{
  await audit('session.login',snap.id,null);
  res.json({token,expiresAt:NOW()+ttl,uid:snap.id,profile:safeUser(snap.id,snap.data())});
 }));
-app.use('/session',authorize);
-app.get('/session',(req,res)=>res.json({uid:req.actor.id,profile:safeUser(req.actor.id,req.actor),ok:true}));
-app.delete('/session',asyncRoute(async(req,res)=>{
+app.get('/session',authorize,(req,res)=>res.json({uid:req.actor.id,profile:safeUser(req.actor.id,req.actor),ok:true}));
+app.delete('/session',authorize,asyncRoute(async(req,res)=>{
  await db.collection('_studySessions').doc(req.sessionHash).delete();res.json({ok:true});
 }));
 app.use('/data',authorize);
