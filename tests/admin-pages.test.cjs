@@ -60,3 +60,17 @@ test('admin can remove clinic study access, never remove own administrator ident
  assert.ok(rules.includes('request.resource.data.removedAt == request.time'));
  assert.ok(rules.includes('allow delete: if false;'));
 });
+
+test('username pattern compiles using the modern UnicodeSets v flag and accepts clinic handles',()=>{
+ const extracted=app.match(/<input name="username"[^']*?pattern="([^"]+)"/);
+ assert.ok(extracted,'Username creation field pattern not found');
+ // The template string encodes a literal backslash as two backslashes in JavaScript source.
+ const effective=extracted[1].replace(/\\\\/g,'\\');
+ const regexp=new RegExp('^(?:'+effective+')$','v');
+ for(const valid of ['clinic01','clinic-01','clinic_01','clinic.01']){
+  assert.ok(regexp.test(valid),'Valid username rejected: '+valid);
+ }
+ for(const invalid of ['clinic 01','ab','clinic!01','اسم-العيادة']){
+  assert.equal(regexp.test(invalid),false,'Invalid username accepted: '+invalid);
+ }
+});
