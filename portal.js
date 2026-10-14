@@ -24,6 +24,8 @@ function updateLanguage(){
  $('loginTitle').textContent=t('Login','تسجيل الدخول');$('loginDesc').textContent=t('Access your assigned study workspace.','ادخل إلى مساحة العمل المخصصة لعيادتك.');
  $('usernameLabel').textContent=t('Username','اسم المستخدم');$('passwordLabel').textContent=t('Password','كلمة المرور');
  $('loginButton').textContent=t('Enter portal →','دخول بوابة الدراسة ←');
+ $('rememberText').textContent=t('Remember me on this device','تذكرني على هذا الجهاز');
+ $('adminRememberText').textContent=t('Remember me on this device','تذكرني على هذا الجهاز');
  $('adminTitle').textContent=t('Administrator Access','دخول مسؤول الدراسة');
  $('adminUsernameLabel').textContent=t('Username','اسم المستخدم');$('adminPasswordLabel').textContent=t('Password','كلمة المرور');
  $('adminLoginButton').textContent=t('Access dashboard →','الدخول إلى لوحة الإدارة ←');
