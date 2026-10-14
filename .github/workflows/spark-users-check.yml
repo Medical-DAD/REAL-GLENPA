@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - 'portal.js'
+      - 'firestore.rules'
+      - 'tests/clinical-history.test.cjs'
       - 'index.html'
       - 'admin-tools/**'
       - 'tests/spark-users.test.cjs'
@@ -22,4 +24,4 @@ jobs:
           node --check portal.js
           node --check admin-tools/manage.cjs
       - name: Validate Spark user-management invariants
-        run: node --test tests/spark-users.test.cjs
+        run: node --test tests/spark-users.test.cjs tests/clinical-history.test.cjs
