@@ -3,6 +3,7 @@ import{initializeApp,deleteApp}from'https://www.gstatic.com/firebasejs/11.10.0/f
 import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,deleteUser,setPersistence,browserSessionPersistence}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import{getFirestore,doc,getDoc,getDocs,collection,query,where,setDoc,updateDoc,writeBatch,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import{firebaseConfig}from'./firebase-config.js';
+import{downloadClinicTemplate,readClinicTemplate}from'./excel-lite.js';
 
 const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
 const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
@@ -12,7 +13,7 @@ const INTERNAL_CLINIC_DOMAIN='glenpa-real.firebaseapp.com';
 
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
-const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,visitDocs:new Map(),settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
+const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,visitDocs:new Map(),patientNames:new Map(),settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,ar)=>current.language==='ar'?ar:en;
 const isAdmin=()=>current.profile?.role==='study_oversight';
@@ -161,19 +162,30 @@ function readMedicalFields(form){
  };
 }
 
+function patientName(p){
+ const entry=current.patientNames.get(p.id);
+ return entry?entry.firstName+' '+entry.lastName:p.patientCode;
+}
+const normalizeSearch=value=>String(value||'').normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g,'').toLocaleLowerCase().trim().replace(/\s+/g,' ');
 function patientsView(){
  const enrollment=isClinic()&&current.settings.enrollmentEnabled===true;
  const myList=isAdmin()?current.patients:current.patients.filter(p=>p.clinicCode===clinicKey());
- let patient=current.patient&&myList.find(x=>x.id===current.patient);
+ const patient=current.patient&&myList.find(x=>x.id===current.patient);
  if(patient)return patientView(patient);
- let heading='<div class="row"><p class="muted">'+t('Coded study records only. Patient names are not collected.','سجلات مرمّزة فقط، ولا تُجمع أسماء المرضى.')+'</p>'+
- '<div class="actions">'+(enrollment?'<button class="cta" id="newPatientBtn">'+t('Enroll patient','تسجيل مريض')+'</button>':'')+
- '<button class="secondary" id="exportCsvBtn">'+t('Export coded CSV','تصدير CSV مرمّز')+'</button></div></div>';
- if(isClinic()&&!enrollment)heading+='<div class="notice">'+t('Enrollment is currently disabled by study settings.','التسجيل متوقف حاليًا بحسب إعدادات الدراسة.')+'</div>';
- return panel(t('Patient registry','سجل المرضى'),heading+
- '<div class="table-scroll"><table><thead><tr><th>'+t('Study ID','رمز الدراسة')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Age','العمر')+'</th><th>'+t('Sex','الجنس')+'</th><th>'+t('Created','تاريخ الإنشاء')+'</th><th>'+t('Details','التفاصيل')+'</th></tr></thead><tbody>'+
- myList.map(p=>'<tr><td><b>'+esc(p.patientCode)+'</b></td><td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+'</td><td>'+esc(p.sex)+'</td><td>'+esc(p.createdAt?.toDate?.()?.toLocaleDateString?.()||'—')+'</td><td><button class="link" data-patient="'+esc(p.id)+'">'+t('Open','فتح')+'</button></td></tr>').join('')+'</tbody></table></div>'+
- (myList.length?'':'<div class="empty">'+t('No records enrolled.','لا توجد سجلات مسجلة بعد.')+'</div>'));
+ const search=isClinic()?'<label class="patient-search">'+t('Search patients by first and last name','ابحث عن المريض بالاسم الأول واسم العائلة')+
+ '<input id="patientSearch" type="search" autocomplete="off" placeholder="'+t('Type the patient name…','اكتب اسم المريض…')+'"></label>':'';
+ const heading='<div class="row"><p class="muted">'+t('Clinic staff can search patient names. Study reporting remains coded.','العيادة تستطيع البحث باسم المريض، بينما تبقى بيانات الدراسة مرمّزة.')+'</p>'+
+ '<div class="actions">'+(enrollment?'<button class="cta" id="newPatientBtn">'+t('+ Enroll patient','+ تسجيل مريض')+'</button>':'')+
+ '<button class="secondary" id="exportCsvBtn">'+t('Export coded study data','تصدير بيانات الدراسة المرمّزة')+'</button></div></div>';
+ const notice=isClinic()&&!enrollment?'<div class="notice">'+t('New enrollment is currently disabled.','تسجيل المرضى الجدد متوقف حاليًا.')+'</div>':'';
+ return panel(t('Patient registry','سجل المرضى'),heading+notice+search+
+ '<div class="table-scroll"><table><thead><tr><th>'+t('Patient','المريض')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Age / Sex','العمر / الجنس')+'</th><th>'+t('Diabetes years','سنوات السكري')+'</th><th>'+t('History','السجل')+'</th></tr></thead><tbody>'+
+ myList.map(p=>'<tr class="patient-list-row" data-patient-search="'+esc(normalizeSearch(patientName(p)+' '+p.patientCode))+'">'+
+ '<td><b>'+esc(patientName(p))+'</b>'+(isClinic()?'<small class="subtle-id">'+t('Study reference','رمز الدراسة')+': '+esc(p.patientCode)+'</small>':'')+'</td>'+
+ '<td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+' / '+esc(p.sex)+'</td><td>'+esc(p.diabetesYears)+'</td>'+
+ '<td><button class="link" data-patient="'+esc(p.id)+'">'+t('View patient','عرض الملف')+'</button></td></tr>').join('')+
+ '</tbody></table></div>'+'<p id="patientSearchEmpty" class="empty hidden">'+t('No matching patients.','لا يوجد مرضى مطابقون للبحث.')+'</p>'+
+ (myList.length?'':'<div class="empty">'+t('No patients enrolled.','لا يوجد مرضى مسجلون.')+'</div>'));
 }
 function clinicalFact(label,value,suffix=''){
  return '<div class="clinical-fact"><span>'+label+'</span><strong>'+showValue(value)+(value!==null&&value!==undefined&&String(value)!==''?suffix:'')+'</strong></div>';
@@ -183,6 +195,7 @@ function patientView(p){
  const conditions=Array.isArray(p.diagnoses)?p.diagnoses:[];
  const names=conditions.map(labelComorbidity);
  if(p.otherDiagnoses)names.push(esc(p.otherDiagnoses));
+ const fullName=current.patientNames.get(p.id);
  const clinicalProfile=panel(t('Diabetes profile & medical history','ملف السكري والتاريخ المرضي'),
   '<div class="clinical-kv">'+
   '<div><small>'+t('Sex','الجنس')+'</small><strong>'+(p.sex==='Female'?t('Female','أنثى'):p.sex==='Male'?t('Male','ذكر'):showValue(p.sex))+'</strong></div>'+
@@ -192,7 +205,10 @@ function patientView(p){
   '</div><h3>'+t('Baseline concomitant medications','الأدوية المصاحبة الأساسية')+'</h3>'+
   medicationTable(medicationLines(p))+
   (canWrite?'<div class="actions"><button class="secondary" type="button" id="editMedicalProfile">'+t('Edit medical profile','تعديل التاريخ المرضي والأدوية')+'</button></div>':''));
- return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+t('← Back to patient registry','← الرجوع إلى سجل المرضى')+'</button></div>'+
+ return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+t('← Back to patient registry','← الرجوع إلى سجل المرضى')+'</button></div>'+ 
+ (fullName?'<div class="patient-name-hero"><h2>'+esc(fullName.firstName+' '+fullName.lastName)+'</h2><small>'+t('Internal study reference','الرمز الداخلي للدراسة')+': '+esc(p.patientCode)+'</small></div>':
+ '<div class="patient-name-hero"><h2>'+t('Patient name not recorded','اسم المريض غير مسجل')+'</h2><small>'+esc(p.patientCode)+'</small></div>')+
+ (canWrite?'<div class="actions"><button class="secondary" id="editPatientName">'+t(fullName?'Correct patient name':'Add patient name',fullName?'تصحيح اسم المريض':'إضافة اسم المريض')+'</button></div>':'')+
  '<div class="grid">'+metric(t('Coded study ID','رمز المريض'),esc(p.patientCode))+
  metric(t('Age','العمر'),esc(p.age))+
  metric(t('Recorded study visits','الزيارات المسجّلة'),'<span id="patientVisitCount">…</span>')+'</div>'+
@@ -274,6 +290,10 @@ async function loadRecords(){
   current.clinics.sort((a,b)=>a.id.localeCompare(b.id));
   const ps=isAdmin()?await getDocs(collection(db,'patients')):await getDocs(query(collection(db,'patients'),where('clinicCode','==',clinicKey())));
   current.patients=ps.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
+  if(isClinic()){
+   const directory=await getDocs(query(collection(db,'patientDirectory'),where('clinicCode','==',clinicKey())));
+   current.patientNames=new Map(directory.docs.map(d=>[d.id,d.data()]));
+  }else current.patientNames=new Map();
   try{const settings=await getDoc(doc(db,'siteSettings','main'));current.settings=settings.exists()?settings.data():{studyTitle:'GLENPA REAL',enrollmentEnabled:false}}catch(e){current.settings={studyTitle:'GLENPA REAL',enrollmentEnabled:false}}
   if(isAdmin()){
    const users=await getDocs(collection(db,'userProfiles'));current.users=users.docs.map(d=>({id:d.id,...d.data()}));
