@@ -1,6 +1,9 @@
-// Public Firebase web SDK settings. Replace null with your Firebase web-app config.
-window.GLENPA_FIREBASE_CONFIG = null;
-// Use a study-owned domain approved and configured by IT, e.g. accounts.yourcompany.org.
-// Each Firebase Auth account is provisioned by the administrator as username@this-domain.
-// Do NOT use the old demonstration passwords for real clinical data.
-window.GLENPA_USERNAME_DOMAIN = 'REPLACE_ME';
+export const firebaseConfig = {
+  apiKey: "AIzaSyCA5SjnJmN5V8xpReBtI229vJ8lAmAB4tk",
+  authDomain: "glenpa-real.firebaseapp.com",
+  projectId: "glenpa-real",
+  storageBucket: "glenpa-real.firebasestorage.app",
+  messagingSenderId: "955985148965",
+  appId: "1:955985148965:web:b1dae1fb3e7f871edc53cc",
+  measurementId: "G-YSRHXC04KB"
+};
