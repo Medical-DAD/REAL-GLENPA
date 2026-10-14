@@ -95,7 +95,7 @@ function patientsView(){
  if(isClinic()&&!enrollment)heading+='<div class="notice">'+t('Enrollment is currently disabled by study settings.','التسجيل متوقف حاليًا بحسب إعدادات الدراسة.')+'</div>';
  return panel(t('Patient registry','سجل المرضى'),heading+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Study ID','رمز الدراسة')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Age','العمر')+'</th><th>'+t('Sex','الجنس')+'</th><th>'+t('Created','تاريخ الإنشاء')+'</th><th>'+t('Details','التفاصيل')+'</th></tr></thead><tbody>'+
- myList.map(p=>'<tr><td><b>'+esc(p.patientCode)+'</b></td><td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+'</td><td>'+esc(p.sex)+'</td><td>'+esc(p.createdAt?.toDate?.()?.toLocaleDateString?.()||'—')+'</td><td><button class="link" data-patient="'+esc(p.id)+'">'+t('Open','فتح')+'</button></td></tr>').join('')+'</tbody></table></div>'+
+ myList.map(p=>'<tr><td><b>'+esc(p.patientCode)+'</b></td><td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+'</td><td>'+esc(p.sex)+'</td><td>'+esc(p.createdAt?new Date(p.createdAt).toLocaleDateString():'—')+'</td><td><button class="link" data-patient="'+esc(p.id)+'">'+t('Open','فتح')+'</button></td></tr>').join('')+'</tbody></table></div>'+
  (myList.length?'':'<div class="empty">'+t('No records enrolled.','لا توجد سجلات مسجلة بعد.')+'</div>'));
 }
 function patientView(p){
@@ -119,7 +119,7 @@ function usersView(){
  '<p class="help">'+t('Use unique study passwords with at least 14 characters. A password change revokes earlier sessions.','استخدم كلمات مرور مخصصة للدراسة لا تقل عن 14 حرفًا. تغيير كلمة المرور يلغي الجلسات القديمة.')+'</p>'+
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Username','المستخدم')+'</th><th>'+t('Role','الصلاحية')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Status','الحالة')+'</th><th>'+t('Action','الإجراء')+'</th></tr></thead><tbody>'+
- current.users.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(!u.active||u.id!==current.user.uid?'<button class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div>');
+ current.users.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(!u.active||u.id!==current.user.uid?'<button class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button>':'')+' <button class="link" data-passuser="'+esc(u.id)+'">'+t('Change password','تغيير كلمة المرور')+'</button></td></tr>').join('')+'</tbody></table></div>');
 }
 function settingsView(){
  if(!isAdmin())return '';
@@ -306,6 +306,17 @@ async function handleClick(e){
  const editBtn=e.target.closest('[data-editclinic]');if(editBtn){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
   $('view').innerHTML=panel(t('Edit clinic','تعديل العيادة'),'<form id="clinicForm"><input type="hidden" name="code" value="'+esc(c.id)+'"><div class="field-grid"><label>'+t('Doctor','الطبيب')+'<input name="doctorName" value="'+esc(c.doctorName||'')+'" required></label><label>'+t('Specialty','الاختصاص')+'<input name="specialty" value="'+esc(c.specialty||'')+'" required></label><label>'+t('Area','المنطقة')+'<input name="area" value="'+esc(c.area||'')+'" required></label></div><button class="cta" type="submit">'+t('Save changes','حفظ التعديلات')+'</button></form>');return}
+ const passwordButton=e.target.closest('[data-passuser]');
+ if(passwordButton){
+  if(!isAdmin())return;
+  const account=current.users.find(x=>x.id===passwordButton.dataset.passuser);if(!account)return;
+  $('view').innerHTML=panel(t('Change password: ','تغيير كلمة مرور: ')+esc(account.username),
+   '<form id="changePasswordForm"><input type="hidden" name="uid" value="'+esc(account.id)+'"><label>'+t('New password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+
+   '<input type="password" autocomplete="new-password" name="password" required minlength="14" maxlength="128"></label>'+
+   '<button class="cta" type="submit">'+t('Save new password','حفظ كلمة المرور الجديدة')+'</button>'+
+   ' <button class="secondary" type="button" data-nav="users">'+t('Cancel','إلغاء')+'</button></form>');
+  return;
+ }
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
  if(e.target.id==='newPatientBtn')openEnrollForm();
  if(e.target.id==='newVisitBtn'){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p)}
@@ -322,6 +333,7 @@ $('view').addEventListener('submit',e=>{
   if(form.id==='enrollForm')await enrollPatient(form);
   else if(form.id==='visitForm'){const p=current.patients.find(x=>x.id===current.patient);if(p)await saveVisit(form,p)}
   else if(form.id==='createUserForm')await provisionUser(form);
+  else if(form.id==='changePasswordForm'){if(!isAdmin())throw Error('Not authorized');const f=new FormData(form);await changeAccountPassword(String(f.get('uid')),String(f.get('password')));current.view='users';await loadRecords();status(t('Password changed and old sessions revoked.','تم تغيير كلمة المرور وإلغاء الجلسات القديمة.'));}
   else if(form.id==='settingsForm')await updateSettings(form);
   else if(form.id==='clinicForm'){
    if(!isAdmin())throw Error('Unauthorized');
