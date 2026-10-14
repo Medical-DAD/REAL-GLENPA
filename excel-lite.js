@@ -109,7 +109,9 @@ async function extractXlsx(file){
  if(!result['xl/worksheets/sheet1.xml'])throw Error('Workbook has no first worksheet');
  return result;
 }
-const children=(node,name)=>Array.from(node?.children||[]).filter(x=>x.localName===name);
+// XML documents may expose childNodes but not Element.children (e.g. some parsers).
+const children=(node,name)=>Array.from(node?.childNodes||[]).filter(x=>
+ x.nodeType===1 && (x.localName||x.nodeName?.split(':').pop())===name);
 const first=(node,name)=>children(node,name)[0];
 function docXml(input){
  const d=new DOMParser().parseFromString(input,'application/xml');
