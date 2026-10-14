@@ -7,7 +7,7 @@ const app=getApps().length?getApp():initializeApp(firebaseConfig);
 const auth=getAuth(app), db=getFirestore(app);
 const $=id=>document.getElementById(id);
 const knownEmailKey='glenpa-msl-account-email-v1';
-let lastFocus=null,clicks=0,firstClick=0,busy=false;
+let lastFocus=null,clicks=0,firstClick=0,busy=false,linking=false;
 const ar=()=>document.documentElement.lang==='ar';
 const translated=(en,arabic)=>ar()?arabic:en;
 function knownEmail(){try{return localStorage.getItem(knownEmailKey)||''}catch{return ''}}
@@ -21,9 +21,11 @@ modal.innerHTML=[
 '<div class="gl-admin-sign" aria-hidden="true">✦</div>',
 '<span class="gl-login-kicker"><span class="gl-login-dot"></span> GLENPA REAL · PRIVATE ACCESS</span>',
 '<h2 id="glAdminTitle"></h2><p class="gl-login-desc" id="glAdminIntro"></p>',
-'<form id="glAdminForm"><div class="gl-admin-email-step" id="glAdminEmailExplanation"></div>',
-'<label class="gl-input-label" id="glAdminEmailWrap"><span id="glAdminEmailLabel"></span>',
-'<input type="email" id="glAdminEmail" required autocomplete="username" inputmode="email" placeholder="your.account@example.com"></label>',
+'<form id="glAdminForm">',
+'<label class="gl-input-label gl-admin-user-field"><span id="glAdminUsernameLabel"></span><input id="glAdminUsername" value="msl.admin" type="text" readonly aria-readonly="true" autocomplete="off"></label>',
+'<div class="gl-admin-email-step" id="glAdminEmailExplanation" hidden></div>',
+'<div id="glAdminLinkArea" hidden><label class="gl-input-label" id="glAdminEmailWrap"><span id="glAdminEmailLabel"></span>',
+'<input type="email" id="glAdminEmail" autocomplete="email" inputmode="email" placeholder="your.account@example.com"></label></div>',
 '<label class="gl-input-label"><span id="glAdminPasswordLabel"></span>',
 '<input id="glAdminPassword" type="password" required autocomplete="current-password"></label>',
 '<button class="gl-login-cta" type="submit" id="glAdminSubmit"></button>',
@@ -32,31 +34,35 @@ modal.innerHTML=[
 '</section>'].join('');
 document.body.appendChild(modal);
 function renderModal(){
- const email=knownEmail(),needs=email.length===0;
+ const alreadyLinked=Boolean(knownEmail());
  $('glAdminTitle').textContent=translated('Administrator access','الدخول إلى لوحة المسؤول');
- $('glAdminIntro').textContent=translated('Sign in securely with your existing Firebase MSL account.','سجّل الدخول بأمان باستخدام حساب MSL الموجود في فايربيس.');
- $('glAdminEmailWrap').hidden=!needs;
- $('glAdminEmail').required=needs;
- $('glAdminEmailExplanation').hidden=!needs;
- $('glAdminEmailExplanation').textContent=translated('First time only: enter your existing Firebase administrator email. This browser remembers the email, never your password.','للمرة الأولى فقط: أدخل بريد حساب الأدمن الموجود في فايربيس. يتذكر هذا المتصفح البريد فقط، وليس كلمة المرور.');
- $('glAdminEmailLabel').textContent=translated('Firebase administrator email (first time only)','بريد حساب الأدمن في فايربيس (للمرة الأولى فقط)');
+ $('glAdminIntro').textContent=translated('Secure access to your MSL dashboard.','دخول آمن إلى لوحة مسؤول الدراسة.');
+ $('glAdminUsernameLabel').textContent=translated('Username','اسم المستخدم');
+ $('glAdminUsername').value='msl.admin';
+ $('glAdminLinkArea').hidden=!linking;
+ $('glAdminEmail').required=linking;
+ $('glAdminEmailExplanation').hidden=alreadyLinked||linking;
+ $('glAdminEmailExplanation').textContent=translated('On this device, link your existing Firebase administrator account once. Your username is msl.admin; the email is used internally by Firebase only.','على هذا الجهاز فقط، اربط حساب الأدمن الموجود في فايربيس لمرة واحدة. اسم المستخدم هو msl.admin، والبريد يُستخدم داخليًا للمصادقة فقط.');
+ $('glAdminEmailLabel').textContent=translated('Existing Firebase account email (one-time setup)','البريد المرتبط بحساب فايربيس (إعداد لمرة واحدة)');
  $('glAdminPasswordLabel').textContent=translated('Administrator password','كلمة مرور المسؤول');
  $('glAdminSubmit').textContent=translated('Access dashboard →','الدخول إلى لوحة المسؤول ←');
- $('glAdminChangeEmail').textContent=needs?'':translated('Use another Firebase account','استخدام حساب فايربيس آخر');
- $('glAdminChangeEmail').hidden=needs;
+ $('glAdminChangeEmail').textContent=linking?translated('Hide setup','إخفاء الإعداد'):(alreadyLinked?translated('Change linked account','تغيير ربط الحساب'):translated('Link Firebase account once','ربط حساب فايربيس لمرة واحدة'));
  $('glAdminStatus').textContent='';
 }
-function openAdmin(){lastFocus=document.activeElement;renderModal();modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';(knownEmail()?$('glAdminPassword'):$('glAdminEmail')).focus()}
+function openAdmin(){lastFocus=document.activeElement;linking=false;renderModal();modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';$('glAdminPassword').focus()}
 function closeAdmin(){if(busy)return;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';$('glAdminPassword').value='';lastFocus?.focus?.()}
 $('glAdminClose').addEventListener('click',closeAdmin);
 modal.addEventListener('click',e=>{if(e.target===modal)closeAdmin()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))closeAdmin()});
-$('glAdminChangeEmail').addEventListener('click',()=>{forgetEmail();renderModal();$('glAdminEmail').focus()});
+$('glAdminChangeEmail').addEventListener('click',()=>{linking=!linking;renderModal();(linking?$('glAdminEmail'):$('glAdminPassword')).focus()});
 $('glAdminForm').addEventListener('submit',async e=>{
  e.preventDefault();if(busy)return;
- const email=knownEmail()||$('glAdminEmail').value.trim();
+ if($('glAdminUsername').value.trim().toLowerCase()!=='msl.admin'){$('glAdminStatus').textContent=translated('Use your administrator username: msl.admin','استخدم اسم الأدمن: msl.admin');return}
+ const email=linking?$('glAdminEmail').value.trim():knownEmail();
  const password=$('glAdminPassword').value;
- if(!email||!password)return;
+ if(!password)return;
+ if(!email){linking=true;renderModal();$('glAdminStatus').textContent=translated('Please link the Firebase email once before signing in.','يرجى ربط بريد حساب فايربيس لمرة واحدة قبل تسجيل الدخول.');$('glAdminEmail').focus();return;}
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){$('glAdminStatus').textContent=translated('Enter the email of the Firebase account you already created.','أدخل بريد حساب فايربيس الذي أنشأته سابقًا.');return}
  busy=true;$('glAdminSubmit').disabled=true;$('glAdminStatus').textContent=translated('Checking Firebase account and role…','جارٍ التحقق من حساب فايربيس والصلاحيات…');
  try{
   await setPersistence(auth,browserSessionPersistence);
