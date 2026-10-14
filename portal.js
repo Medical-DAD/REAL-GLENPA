@@ -32,15 +32,12 @@ function updateLanguage(){
  document.documentElement.lang=current.language;document.documentElement.dir=current.language==='ar'?'rtl':'ltr';
  $('language').textContent=current.language==='ar'?'English':'العربية';
  $('signout').textContent=t('Sign out','تسجيل الخروج');
- $('welcomeTitle').textContent=t('Clinical study, connected.','دراستك السريرية، في منصة واحدة.');
- $('welcomeDesc').textContent=t('Secure access for participating clinics. Study records are synchronized through the research database.','دخول مخصص للعيادات المشاركة، وسجلات دراسة متصلة بقاعدة البيانات.');
+ $('welcomeTitle').textContent=ADMIN_PAGE?t('Study administration, securely connected.','إدارة الدراسة بأمان وسهولة.'):t('Clinical study, connected.','دراستك السريرية، في منصة واحدة.');
+ $('welcomeDesc').textContent=ADMIN_PAGE?t('Administrator oversight, clinic account management, study records and enrollment progress.','الإشراف على الدراسة وإدارة العيادات والحسابات والزيارات وتقدم التسجيل.'):t('Secure access for participating clinics. Study records are synchronized through the research database.','دخول مخصص للعيادات المشاركة، وسجلات دراسة متصلة بقاعدة البيانات.');
  $('loginTitle').textContent=ADMIN_PAGE?t('Administrator login','دخول مسؤول الدراسة'):t('Login','تسجيل الدخول');
  $('loginDesc').textContent=ADMIN_PAGE?t('Authorized Medical Affairs access only.','دخول مخصص للمخولين من القسم الطبي فقط.'):t('Access your assigned study workspace.','ادخل إلى مساحة العمل المخصصة لعيادتك.');
  $('usernameLabel').textContent=t('Username','اسم المستخدم');$('passwordLabel').textContent=t('Password','كلمة المرور');
  $('loginButton').textContent=ADMIN_PAGE?t('Open admin dashboard →','فتح لوحة الأدمن ←'):t('Enter portal →','دخول بوابة الدراسة ←');
- $('adminTitle').textContent=t('Administrator Access','دخول مسؤول الدراسة');
- $('adminUsernameLabel').textContent=t('Username','اسم المستخدم');$('adminPasswordLabel').textContent=t('Password','كلمة المرور');
- $('adminLoginButton').textContent=t('Access dashboard →','الدخول إلى لوحة الإدارة ←');
  if(isAuthorized())render();
 }
 function showLoader(message){
