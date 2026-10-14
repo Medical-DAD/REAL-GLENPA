@@ -498,6 +498,34 @@ function nextWizardStep(form){
  }
  if(currentStep<2)setWizardStep(form,currentStep+1);
 }
+function openPatientNameForm(patient){
+ if(!eligiblePatientWrite(patient))return;
+ const existing=current.patientNames.get(patient.id)||{};
+ $('view').innerHTML=panel(t('Patient name · clinic directory','اسم المريض · دليل العيادة'),
+ '<p class="muted">'+t('Names are visible only to staff of the assigned clinic, not the study oversight dashboard or coded CSV.','الاسم متاح لعيادة المريض فقط، ولا يظهر في لوحة الإشراف أو تصدير سجلات الدراسة.')+'</p>'+
+ '<form id="patientNameForm"><input type="hidden" name="patientId" value="'+esc(patient.id)+'">'+
+ '<div class="field-grid"><label>'+t('First name','الاسم الأول')+'<input name="firstName" maxlength="60" value="'+esc(existing.firstName||'')+'" required></label>'+
+ '<label>'+t('Last name','اسم العائلة')+'<input name="lastName" maxlength="60" value="'+esc(existing.lastName||'')+'" required></label></div>'+
+ '<div class="actions"><button class="cta" type="submit">'+t('Save patient name','حفظ اسم المريض')+'</button>'+
+ '<button class="secondary" type="button" data-patient="'+esc(patient.id)+'">'+t('Cancel','إلغاء')+'</button></div></form>');
+}
+async function savePatientName(form){
+ if(!isClinic())throw Error('Clinic access required');
+ const data=new FormData(form),patientId=String(data.get('patientId')||'');
+ const patient=current.patients.find(p=>p.id===patientId);
+ if(!patient||patient.clinicCode!==clinicKey())throw Error('Patient access denied');
+ const firstName=String(data.get('firstName')||'').trim(),lastName=String(data.get('lastName')||'').trim();
+ const pat=/^[\p{L}][\p{L}\p{M}'-]{1,59}$/u;
+ if(!pat.test(firstName)||!pat.test(lastName))throw Error(t('Name must be two separate parts.','يجب أن يكون الاسم من مقطعين: اسم أول واسم عائلة.'));
+ const reference=doc(db,'patientDirectory',patient.id),existing=current.patientNames.get(patient.id);
+ if(existing){
+  await updateDoc(reference,{firstName,lastName,updatedBy:current.user.uid,updatedAt:serverTimestamp()});
+ }else{
+  await setDoc(reference,{clinicCode:clinicKey(),firstName,lastName,createdBy:current.user.uid,createdAt:serverTimestamp()});
+ }
+ current.patient=patient.id;await loadRecords();
+ status(t('Patient name updated in the private clinic directory.','تم حفظ اسم المريض في دليل العيادة الخاص.'));
+}
 function openMedicalProfileForm(patient){
  if(!eligiblePatientWrite(patient))return;
  $('view').innerHTML=panel(t('Edit medical history & baseline medicines','تعديل التاريخ المرضي والأدوية الأساسية'),
@@ -597,6 +625,9 @@ async function handleClick(e){
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
  if(e.target.id==='newPatientBtn')openEnrollForm();
  if(e.target.id==='editMedicalProfile'){const p=current.patients.find(x=>x.id===current.patient);if(p)openMedicalProfileForm(p)}
+ if(e.target.id==='editPatientName'){const p=current.patients.find(x=>x.id===current.patient);if(p)openPatientNameForm(p)}
+ if(e.target.id==='wizardNext'){const form=$('view').querySelector('#enrollForm');if(form)nextWizardStep(form);return}
+ if(e.target.id==='wizardBack'){const form=$('view').querySelector('#enrollForm');if(form)setWizardStep(form,wizardStep(form)-1);return}
  const nextVisit=e.target.closest('[data-addvisit]');
  if(nextVisit){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p,nextVisit.dataset.addvisit)}
  if(e.target.id==='backPatients'){current.patient=null;current.visitDocs=new Map();render()}
@@ -606,10 +637,21 @@ async function handleClick(e){
 // Navigation buttons live OUTSIDE #view. Without this listener every top tab is inert.
 $('nav').addEventListener('click',handleClick);
 $('view').addEventListener('click',handleClick);
+$('view').addEventListener('input',e=>{
+ if(e.target.id!=='patientSearch')return;
+ const term=normalizeSearch(e.target.value);
+ let visible=0;
+ $('view').querySelectorAll('.patient-list-row').forEach(row=>{
+  const match=normalizeSearch(row.dataset.patientSearch).includes(term);
+  row.hidden=!match;if(match)visible++;
+ });
+ const empty=$('patientSearchEmpty');if(empty)empty.classList.toggle('hidden',visible>0);
+});
 $('view').addEventListener('submit',e=>{
  e.preventDefault();const form=e.target;
  safeAction(async()=>{
-  if(form.id==='enrollForm')await enrollPatient(form);
+  if(form.id==='enrollForm'){if(wizardStep(form)<2){nextWizardStep(form);return}await enrollPatient(form);}
+  else if(form.id==='patientNameForm')await savePatientName(form);
   else if(form.id==='visitForm'){const p=current.patients.find(x=>x.id===current.patient);if(p)await saveVisit(form,p)}
   else if(form.id==='medicalProfileForm'){const p=current.patients.find(x=>x.id===current.patient);if(p)await updateMedicalProfile(form,p)}
   else if(form.id==='createUserForm')await provisionUser(form);
