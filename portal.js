@@ -182,7 +182,7 @@ function patientView(p){
  if(p.otherDiagnoses)names.push(esc(p.otherDiagnoses));
  const clinicalProfile=panel(t('Diabetes profile & medical history','ملف السكري والتاريخ المرضي'),
   '<div class="clinical-kv">'+
-  '<div><small>'+t('Sex','الجنس')+'</small><strong>'+t(p.sex==='Female'?'Female':'Male',p.sex==='Female'?'أنثى':'ذكر')+'</strong></div>'+
+  '<div><small>'+t('Sex','الجنس')+'</small><strong>'+p.sex==='Female'?t('Female','أنثى'):p.sex==='Male'?t('Male','ذكر'):showValue(p.sex)+'</strong></div>'+
   '<div><small>'+t('Diabetes duration','مدة السكري')+'</small><strong>'+showValue(p.diabetesYears)+' '+t('years','سنة')+'</strong></div>'+
   '<div><small>'+t('Medical history','التاريخ المرضي')+'</small><strong>'+showValue(p.history)+'</strong></div>'+
   '<div><small>'+t('Comorbidities','الأمراض المصاحبة')+'</small><strong>'+(names.length?names.join('، '):t('Not recorded','غير مسجّلة'))+'</strong></div>'+
@@ -311,7 +311,7 @@ async function enrollPatient(form){
  const medical=readMedicalFields(form);
  if(medical.history.length>1500||medical.otherDiagnoses.length>500||medical.medications.length>1600)throw Error(t('Clinical text exceeds permitted limits.','النص السريري أطول من الحد المسموح.'));
  const clinicCode=clinicKey(),patientId=clinicCode+'_'+id;
- if((await getDoc(doc(db,'patients',patientId))).exists())throw Error(t('Study ID already exists.','رمز هذا المريض مسجّل مسبقًا.'));
+ if(current.patients.some(p=>p.id===patientId))throw Error(t('Study ID already exists in this clinic.','رمز هذا المريض موجود مسبقًا في العيادة.'));
  const baseline=getVisitValues(form,'baseline');
  const payload={clinicCode,patientCode:id,age,sex:String(f.get('sex')),diabetesYears,...medical,
   createdBy:current.user.uid,createdAt:serverTimestamp()};
