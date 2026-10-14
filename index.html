@@ -220,4 +220,114 @@ let savedTheme='blue';try{savedTheme=localStorage.getItem('glenpa-theme-preferen
  guide.addEventListener('click',e=>{if(e.target===guide)guide.classList.remove('visible')});
  window.addEventListener('appinstalled',hide);
 })();
-</script><script src="./site-admin.js?v=20261014" defer></script><script type="module" src="./login-experience.js?v=20261014d"></script></body></html>
+</script><script src="./site-admin.js?v=20261014" defer></script><script>
+/* Standalone demonstration MSL access. This is NOT secure authentication.
+   No Firebase access, server tokens, patient data, or stored passwords. */
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const adminUser='msl.admin';
+  const kdfSalt='GLENPA-REAL-demo-msl-2026-oct-v1';
+  const kdfRounds=240000;
+  const expectedProof='3d351d67ce5bfabc76255493a9ef4e1e0cdf56e34222981f0b58d80f75d5157a';
+  let taps=0,sequenceStart=0,pending=false,priorFocus=null;
+  const arabic=()=>document.documentElement.lang==='ar';
+  const tr=(en,ar)=>arabic()?ar:en;
+  const root=document.createElement('div');
+  root.className='gl-admin-overlay';root.id='glAdminOverlay';
+  root.setAttribute('aria-hidden','true');
+  root.innerHTML=[
+  '<section class="gl-admin-modal" role="dialog" aria-modal="true" aria-labelledby="glAdminTitle">',
+  '<button type="button" class="gl-admin-x" id="glAdminClose" aria-label="Close">×</button>',
+  '<div class="gl-admin-sign" aria-hidden="true">✦</div>',
+  '<span class="gl-login-kicker"><span class="gl-login-dot"></span> GLENPA REAL · PRIVATE ACCESS</span>',
+  '<h2 id="glAdminTitle"></h2><p class="gl-login-desc" id="glAdminIntro"></p>',
+  '<form id="glAdminForm">',
+  '<label class="gl-input-label gl-admin-user-field"><span id="glAdminUsernameLabel"></span><input id="glAdminUsername" type="text" readonly aria-readonly="true" value="msl.admin" autocomplete="off"></label>',
+  '<label class="gl-input-label"><span id="glAdminPasswordLabel"></span><input id="glAdminPassword" type="password" required autocomplete="current-password"></label>',
+  '<button type="submit" class="gl-login-cta" id="glAdminSubmit"></button>',
+  '<p class="gl-login-status" id="glAdminStatus" role="status" aria-live="polite"></p>',
+  '</form></section>'
+  ].join('');
+  document.body.append(root);
+  const fields=()=>(root.querySelectorAll('button, input'));
+  function translate(){
+    $('glAdminTitle').textContent=tr('Administrator Access','دخول مسؤول الدراسة');
+    $('glAdminIntro').textContent=tr('Fictional-data demonstration only.','عرض تجريبي ببيانات افتراضية فقط.');
+    $('glAdminUsernameLabel').textContent=tr('Username','اسم المستخدم');
+    $('glAdminPasswordLabel').textContent=tr('Password','كلمة المرور');
+    $('glAdminSubmit').textContent=tr('Enter dashboard →','الدخول إلى لوحة الإدارة ←');
+    $('glAdminStatus').textContent='';
+  }
+  function open(){
+    priorFocus=document.activeElement;translate();
+    root.classList.add('open');root.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+    $('glAdminPassword').focus();
+  }
+  function close(){
+    if(pending)return;
+    root.classList.remove('open');root.setAttribute('aria-hidden','true');
+    $('glAdminPassword').value='';document.body.style.overflow='';
+    priorFocus?.focus?.();
+  }
+  async function proof(secret){
+    const encoded=new TextEncoder();
+    const key=await crypto.subtle.importKey('raw',encoded.encode(secret),'PBKDF2',false,['deriveBits']);
+    const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:encoded.encode(kdfSalt),iterations:kdfRounds,hash:'SHA-256'},key,256);
+    return Array.from(new Uint8Array(bits),b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  function equal(a,b){
+    if(a.length!==b.length)return false;
+    let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);
+    return diff===0;
+  }
+  $('glAdminClose').onclick=close;
+  root.addEventListener('click',e=>{if(e.target===root)close()});
+  document.addEventListener('keydown',e=>{
+    if(!root.classList.contains('open'))return;
+    if(e.key==='Escape'){e.preventDefault();close()}
+    if(e.key==='Tab'){
+      const focusables=Array.from(fields()).filter(x=>!x.disabled);
+      const first=focusables[0],last=focusables.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+    }
+  });
+  $('glAdminForm').addEventListener('submit',async e=>{
+    e.preventDefault();if(pending)return;
+    const username=$('glAdminUsername').value.trim().toLowerCase();
+    const password=$('glAdminPassword').value;
+    if(!password)return;
+    pending=true;$('glAdminSubmit').disabled=true;
+    $('glAdminStatus').textContent=tr('Checking demo access…','جارٍ التحقق من الدخول التجريبي…');
+    try{
+      const result=await proof(password);
+      if(username===adminUser&&equal(result,expectedProof)){
+        pending=false;close();
+        window.dispatchEvent(new CustomEvent('glenpa:admin-authorized',{detail:{demo:true}}));
+      }else{
+        $('glAdminStatus').textContent=tr('Invalid username or password.','اسم المستخدم أو كلمة المرور غير صحيحة.');
+      }
+    }catch(error){
+      $('glAdminStatus').textContent=tr('This browser could not complete the demonstration login.','تعذّر إتمام تسجيل الدخول التجريبي في هذا المتصفح.');
+    }finally{pending=false;$('glAdminSubmit').disabled=false}
+  });
+  const logo=document.querySelector('header .brand');
+  if(logo){
+    logo.classList.add('gl-brand-trigger');
+    logo.setAttribute('role','button');logo.setAttribute('tabindex','0');
+    logo.setAttribute('aria-label','GLENPA REAL');
+    function activate(){
+      const now=Date.now();
+      if(now-sequenceStart>4500){taps=0;sequenceStart=now}
+      if(++taps>=5){taps=0;sequenceStart=0;open()}
+    }
+    logo.addEventListener('click',activate);
+    logo.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}
+    });
+  }
+  window.GLENPA_AUTH={signOutAdmin:async()=>{}};
+})();
+</script></body></html>
