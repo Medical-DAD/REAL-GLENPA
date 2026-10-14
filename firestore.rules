@@ -28,6 +28,11 @@ service cloud.firestore {
     function patientPath(id) {
       return /databases/$(database)/documents/patients/$(id);
     }
+    function previousVisitExists(patientId, phase) {
+      return phase == 'baseline'
+        || (phase == 'month3' && exists(/databases/$(database)/documents/patients/$(patientId)/visits/baseline))
+        || (phase == 'month6' && exists(/databases/$(database)/documents/patients/$(patientId)/visits/month3));
+    }
     // The username lookup is a single-document public read, never a list.
     // Only administrators can create mappings, which are paired with a profile.
     match /loginHandles/{username} {
@@ -123,6 +128,7 @@ service cloud.firestore {
         allow create: if clinic()
           && get(patientPath(patientId)).data.clinicCode == myClinic()
           && visitId in ['baseline','month3','month6']
+          && previousVisitExists(patientId,visitId)
           && request.resource.data.keys().hasOnly(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','notes','updatedBy','updatedAt'])
           && request.resource.data.keys().hasAll(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','notes','updatedBy','updatedAt'])
           && request.resource.data.phase == visitId
