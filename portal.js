@@ -175,6 +175,9 @@ function patientsView(){
  myList.map(p=>'<tr><td><b>'+esc(p.patientCode)+'</b></td><td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+'</td><td>'+esc(p.sex)+'</td><td>'+esc(p.createdAt?.toDate?.()?.toLocaleDateString?.()||'—')+'</td><td><button class="link" data-patient="'+esc(p.id)+'">'+t('Open','فتح')+'</button></td></tr>').join('')+'</tbody></table></div>'+
  (myList.length?'':'<div class="empty">'+t('No records enrolled.','لا توجد سجلات مسجلة بعد.')+'</div>'));
 }
+function clinicalFact(label,value,suffix=''){
+ return '<div class="clinical-fact"><span>'+label+'</span><strong>'+showValue(value)+(value!==null&&value!==undefined&&String(value)!==''?suffix:'')+'</strong></div>';
+}
 function patientView(p){
  const canWrite=isClinic()&&p.clinicCode===clinicKey();
  const conditions=Array.isArray(p.diagnoses)?p.diagnoses:[];
@@ -182,7 +185,7 @@ function patientView(p){
  if(p.otherDiagnoses)names.push(esc(p.otherDiagnoses));
  const clinicalProfile=panel(t('Diabetes profile & medical history','ملف السكري والتاريخ المرضي'),
   '<div class="clinical-kv">'+
-  '<div><small>'+t('Sex','الجنس')+'</small><strong>'+p.sex==='Female'?t('Female','أنثى'):p.sex==='Male'?t('Male','ذكر'):showValue(p.sex)+'</strong></div>'+
+  '<div><small>'+t('Sex','الجنس')+'</small><strong>'+(p.sex==='Female'?t('Female','أنثى'):p.sex==='Male'?t('Male','ذكر'):showValue(p.sex))+'</strong></div>'+
   '<div><small>'+t('Diabetes duration','مدة السكري')+'</small><strong>'+showValue(p.diabetesYears)+' '+t('years','سنة')+'</strong></div>'+
   '<div><small>'+t('Medical history','التاريخ المرضي')+'</small><strong>'+showValue(p.history)+'</strong></div>'+
   '<div><small>'+t('Comorbidities','الأمراض المصاحبة')+'</small><strong>'+(names.length?names.join('، '):t('Not recorded','غير مسجّلة'))+'</strong></div>'+
