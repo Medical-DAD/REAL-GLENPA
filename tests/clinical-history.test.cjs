@@ -7,7 +7,7 @@ const section=(begin,end)=>app.slice(app.indexOf(begin),app.indexOf(end,app.inde
 test('new patients must enter clinical history, diseases, and baseline medicines',()=>{
  const form=section('function openEnrollForm(){','function openMedicalProfileForm(');
  assert.ok(form.includes('medicalFields()'));
- assert.ok(form.includes('Baseline · Visit 1 (saved automatically)'));
+ assert.ok(form.includes('STEP 03 · BASELINE'));
  for(const name of ['date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','diagnosis','notes']){
   assert.ok(form.includes('name="'+name+'"'),name);
  }
@@ -19,6 +19,7 @@ test('patient registration commits profile and Baseline together atomically',()=
  assert.ok(enroll.includes("const baseline=getVisitValues(form,'baseline')"));
  assert.ok(enroll.includes("batch.set(doc(db,'patients',patientId),payload)"));
  assert.ok(enroll.includes("batch.set(doc(db,'patients',patientId,'visits','baseline'),baseline)"));
+ assert.ok(enroll.includes("batch.set(doc(db,'patientDirectory',patientId)"));
  assert.ok(enroll.includes('await batch.commit()'));
  assert.ok(!enroll.includes('await setDoc('));
 });
@@ -40,7 +41,7 @@ test('new patient Baseline is required by Firestore and clinic isolation remains
 test('CSV preserves patient clinical history, medicines and all visits',()=>{
  const csv=section('async function exportCodedCSV(){','async function downloadQR(){');
  for(const col of ['medicalHistory','comorbidities','baselineMedications','newDiagnoses','adverseEvent','clinicalNotes'])assert.ok(csv.includes(col));
- assert.ok(html.includes('portal.js?v=20261014-clinical-history-v1'));
+ assert.ok(html.includes('portal.js?v=20261014-private-directory-v1'));
 });
 
 test('rendered patient chart displays conditions, baseline medicines and visit history',()=>{
@@ -50,7 +51,7 @@ test('rendered patient chart displays conditions, baseline medicines and visit h
  assert.ok(start>0&&stop>start);
  const elements=new Map();
  const lookup=id=>{
-  if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',classList:{add(){},remove(){},toggle(){}}});
+  if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',classList:{add(){},remove(){},toggle(){}},querySelector(){return {focus(){}}}});
   return elements.get(id);
  };
  let visitDocs=[];
@@ -78,7 +79,7 @@ test('rendered patient chart displays conditions, baseline medicines and visit h
   assert.ok(html.includes(phrase),'Rendered chart missing: '+phrase);
  }
  ui.openEnrollForm();
- assert.ok(lookup('view').innerHTML.includes('Baseline · Visit 1'));
+ assert.ok(lookup('view').innerHTML.includes('STEP 03 · BASELINE'));
  visitDocs=['baseline','month3','month6'].map((id,index)=>({
   id,data:()=>({phase:id,date:'2026-0'+(1+index*3)+'-15',hba1c:8-index*.1,
    fpg:142,egfr:85,weight:72,dose:'10/5 mg',adverseEvent:'None reported',
