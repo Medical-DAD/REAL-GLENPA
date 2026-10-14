@@ -41,7 +41,7 @@ test('new patient Baseline is required by Firestore and clinic isolation remains
 test('CSV preserves patient clinical history, medicines and all visits',()=>{
  const csv=section('async function exportCodedCSV(){','async function downloadQR(){');
  for(const col of ['medicalHistory','comorbidities','baselineMedications','newDiagnoses','adverseEvent','clinicalNotes'])assert.ok(csv.includes(col));
- assert.ok(html.includes('portal.js?v=20261014-separate-admin-loader-v1'));
+ assert.ok(html.includes('portal.js?v=20261014-username-pattern-v2'));
 });
 
 test('rendered patient chart displays conditions, baseline medicines and visit history',()=>{
