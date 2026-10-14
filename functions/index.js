@@ -58,9 +58,14 @@ async function checkThrottle(username,ip){
  if(d.until&&d.until>now)throw fail(429,'Too many attempts. Try again later.');
  return {ref:doc,data:d};
 }
-async function recordFailure(ref,d){
- const now=NOW(),count=(d.windowStart&&now-d.windowStart<900000?d.count||0:0)+1;
- await ref.set({count,windowStart: d.windowStart&&now-d.windowStart<900000?d.windowStart:now,until: count>=5?now+900000:0});
+async function recordFailure(ref,_previous){
+ const now=NOW();
+ await db.runTransaction(async trx=>{
+  const snap=await trx.get(ref),data=snap.data()||{};
+  const recent=data.windowStart&&now-data.windowStart<900000;
+  const count=(recent?data.count||0:0)+1;
+  trx.set(ref,{count,windowStart:recent?data.windowStart:now,until:count>=5?now+900000:0});
+ });
 }
 async function authorize(req,res,next){
  try{
