@@ -316,7 +316,7 @@ function usersView(){
  '<label>'+t('Clinic','العيادة')+'<select name="clinicCode" required>'+current.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.id+' · '+(c.doctorName||''))+'</option>').join('')+'</select></label>'+
  '<label>'+t('Numeric password (6 digits minimum)','كلمة مرور رقمية (6 أرقام على الأقل)')+'<input type="password" name="password" inputmode="numeric" pattern="[0-9]{6,32}" required minlength="6" maxlength="32" autocomplete="new-password" title="6 to 32 digits"></label></div>'+
  '<div class="actions"><button class="cta" type="submit">'+t('Create clinic account','إنشاء حساب العيادة')+'</button></div></form>'+
- '<p class="help">'+t('Six digits are the minimum, not a strong medical-data password. Disable users instantly here. Password resets and permanent account deletion are performed using the private local administrator tool, without Blaze or additional hosting.','ستة أرقام هي الحد الأدنى وليست كلمة مرور قوية لبيانات طبية. يمكنك تعطيل الحسابات هنا فورًا. تغيير كلمات المرور والحذف النهائي يتمان عبر أداة إدارة خاصة على جهازك دون Blaze أو استضافة إضافية.')+'</p>'+
+ '<p class="help">'+t('Six digits are the minimum, not a strong medical-data password. You can remove users from this study immediately, but permanent Firebase Authentication deletion requires the local administrator tool.','ستة أرقام هي الحد الأدنى وليست كلمة مرور قوية لبيانات طبية. يمكنك إزالة صلاحية المستخدم من الدراسة فورًا، أما الحذف النهائي من Firebase Authentication فيتم باستخدام أداة الأدمن على جهازك.')+'</p>'+
  '<div class="excel-import-card"><div class="row"><div><h3>'+t('Import clinic accounts from Excel','استيراد حسابات العيادات من Excel')+'</h3>'+
  '<p class="muted">'+t('Download the template, fill doctor details, username and PIN, then upload the .xlsx file. Up to 26 clinics.','نزّل القالب واملأ اسم الطبيب والتخصص والمنطقة واسم المستخدم والرقم السري ثم ارفع ملف Excel. حتى 26 عيادة.')+'</p></div></div>'+
  '<div class="actions"><button type="button" class="secondary" id="downloadClinicXlsx">'+t('Download Excel template','تنزيل قالب Excel')+'</button>'+
@@ -327,7 +327,11 @@ function usersView(){
  '<p class="help"><a href="https://github.com/Medical-DAD/REAL-GLENPA/blob/main/ADMIN_USERS_GUIDE_AR.md" target="_blank" rel="noopener noreferrer">'+t('Local password reset and permanent account deletion instructions','تعليمات تغيير كلمة المرور والحذف النهائي على جهاز الأدمن')+'</a></p>'+ 
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Username','المستخدم')+'</th><th>'+t('Role','الصلاحية')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Status','الحالة')+'</th><th>'+t('Action','الإجراء')+'</th></tr></thead><tbody>'+
- current.users.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(!u.active||u.id!==current.user.uid?'<button class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div>');
+ current.users.filter(u=>u.removed!==true).map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(u.role==='clinic'&&u.id!==current.user.uid?'<div class="user-row-actions"><button type="button" class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button><button type="button" class="link destructive" data-removeuser="'+esc(u.id)+'">'+t('Remove user','إزالة المستخدم')+'</button></div>':'—')+'</td></tr>').join('')+'</tbody></table></div>'+
+ '<details class="removed-users"><summary>'+t('Removed study accounts','الحسابات التي تمت إزالتها')+' ('+current.users.filter(u=>u.removed===true).length+')</summary>'+
+ '<p class="help">'+t('Removed users have no study access. Their Firebase Authentication records can be permanently deleted using the local administrator tool.','الحسابات التي تمت إزالتها لا تستطيع الوصول إلى الدراسة. يمكن حذفها نهائيًا من Firebase Authentication باستخدام أداة الأدمن المحلية.')+'</p>'+
+ '<div class="removed-user-list">'+current.users.filter(u=>u.removed===true).map(u=>'<span class="pill">'+esc(u.username)+'</span>').join(' ')+
+ '</div></details>');
 }
 function settingsView(){
  if(!isAdmin())return '';
@@ -849,6 +853,26 @@ async function handleClick(e){
  const editBtn=e.target.closest('[data-editclinic]');if(editBtn){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
   $('view').innerHTML=panel(t('Edit clinic','تعديل العيادة'),'<form id="clinicForm"><input type="hidden" name="code" value="'+esc(c.id)+'"><div class="field-grid"><label>'+t('Doctor','الطبيب')+'<input name="doctorName" value="'+esc(c.doctorName||'')+'" required></label><label>'+t('Specialty','الاختصاص')+'<input name="specialty" value="'+esc(c.specialty||'')+'" required></label><label>'+t('Area','المنطقة')+'<input name="area" value="'+esc(c.area||'')+'" required></label></div><button class="cta" type="submit">'+t('Save changes','حفظ التعديلات')+'</button></form>');return}
+ const remove=e.target.closest('[data-removeuser]');
+ if(remove){
+  if(!isAdmin())return;
+  const user=current.users.find(x=>x.id===remove.dataset.removeuser);
+  if(!user||user.role!=='clinic'||user.id===current.user.uid||user.removed===true)return;
+  const confirmed=window.confirm(t(
+   'Remove '+user.username+' from GLENPA REAL? Access to all study data will be revoked immediately. The underlying Firebase Authentication account must be deleted using the local administrator tool.',
+   'إزالة '+user.username+' من GLENPA REAL؟ سيتم إيقاف وصوله إلى جميع بيانات الدراسة فورًا. حذف الحساب نهائيًا من Firebase Authentication يتطلب أداة الأدمن المحلية.'
+  ));
+  if(!confirmed)return;
+  await safeAction(async()=>{
+   await updateDoc(doc(db,'userProfiles',user.id),{
+    active:false,removed:true,removedBy:current.user.uid,removedAt:serverTimestamp()
+   });
+   await loadRecords();
+   status(t('Study access removed for ','تمت إزالة صلاحية الدراسة عن ')+user.username+
+    t('. Permanent Firebase Authentication deletion is available in the local admin tool.','، والحذف النهائي من Firebase Authentication متاح عبر أداة الأدمن المحلية.'));
+  });
+  return;
+ }
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
  if(e.target.id==='refreshClinicProgress'){if(isAdmin())await safeAction(loadRecords);return}
  if(e.target.id==='downloadClinicXlsx'){if(isAdmin())downloadClinicTemplate();return}
