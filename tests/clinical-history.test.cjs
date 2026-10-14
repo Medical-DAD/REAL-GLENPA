@@ -42,3 +42,53 @@ test('CSV preserves patient clinical history, medicines and all visits',()=>{
  for(const col of ['medicalHistory','comorbidities','baselineMedications','newDiagnoses','adverseEvent','clinicalNotes'])assert.ok(csv.includes(col));
  assert.ok(html.includes('portal.js?v=20261014-clinical-history-v1'));
 });
+
+test('rendered patient chart displays conditions, baseline medicines and visit history',()=>{
+ const vm=require('node:vm');
+ const start=app.indexOf('const WEB_URL=');
+ const stop=app.indexOf('async function handleClick(e)',start);
+ assert.ok(start>0&&stop>start);
+ const elements=new Map();
+ const lookup=id=>{
+  if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',classList:{add(){},remove(){},toggle(){}}});
+  return elements.get(id);
+ };
+ let visitDocs=[];
+ const context={
+  console,document:{getElementById:lookup},window:{},
+  getDocs:async()=>({docs:visitDocs,empty:visitDocs.length===0}),
+  collection:()=>({}),db:{},serverTimestamp:()=>({}),
+  FormData,Date,URL
+ };
+ vm.createContext(context);
+ vm.runInContext(app.slice(start,stop)+
+  '\nglobalThis.exposed={current,patientView,openEnrollForm,showVisits};',context);
+ const ui=context.exposed;
+ ui.current.user={uid:'clinic-test'};
+ ui.current.profile={role:'clinic',active:true,clinicCode:'clinic01'};
+ const patient={
+  id:'clinic01_PT01',clinicCode:'clinic01',patientCode:'PT01',age:57,
+  sex:'Female',diabetesYears:9,history:'Type 2 diabetes',
+  diagnoses:['Hypertension'],otherDiagnoses:'',
+  medications:'Metformin | 1000 mg | Twice daily | Ongoing'
+ };
+ ui.current.patient=patient.id;ui.current.view='patients';
+ const html=ui.patientView(patient);
+ for(const phrase of ['Female','Medical history','Type 2 diabetes','Hypertension','Metformin','Visit history']){
+  assert.ok(html.includes(phrase),'Rendered chart missing: '+phrase);
+ }
+ ui.openEnrollForm();
+ assert.ok(lookup('view').innerHTML.includes('Baseline · Visit 1'));
+ visitDocs=['baseline','month3','month6'].map((id,index)=>({
+  id,data:()=>({phase:id,date:'2026-0'+(1+index*3)+'-15',hba1c:8-index*.1,
+   fpg:142,egfr:85,weight:72,dose:'10/5 mg',adverseEvent:'None reported',
+   medicationChanges:'No changes',diagnosis:'No new disease',notes:'Routine check'})
+ }));
+ return ui.showVisits(patient).then(()=>{
+  const cards=lookup('visitsArea').innerHTML;
+  for(const phrase of ['Baseline','Follow-up 1','Follow-up 2','None reported','No changes',
+   'No new disease','Routine check','142'])
+   assert.ok(cards.includes(phrase),'History missing '+phrase);
+  assert.equal(lookup('patientVisitCount').textContent,'3 / 3');
+ });
+});
