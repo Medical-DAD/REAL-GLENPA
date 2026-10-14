@@ -28,6 +28,23 @@ service cloud.firestore {
     function patientPath(id) {
       return /databases/$(database)/documents/patients/$(id);
     }
+    function validMedicalProfile(data) {
+      return data.history is string
+        && data.history.size() <= 1500
+        && data.diagnoses is list
+        && data.diagnoses.size() <= 14
+        && data.diagnoses.hasOnly([
+          'Hypertension', 'Dyslipidemia', 'Chronic kidney disease',
+          'Coronary artery disease', 'Heart failure', 'Obesity',
+          'Hypothyroidism', 'Atrial fibrillation', 'Peripheral arterial disease',
+          'Stroke or TIA', 'Chronic liver disease',
+          'Chronic obstructive pulmonary disease', 'Asthma', 'Other'
+        ])
+        && data.otherDiagnoses is string
+        && data.otherDiagnoses.size() <= 500
+        && data.medications is string
+        && data.medications.size() <= 1600;
+    }
     function previousVisitExists(patientId, phase) {
       return phase == 'baseline'
         || (phase == 'month3' && exists(/databases/$(database)/documents/patients/$(patientId)/visits/baseline))
@@ -106,8 +123,9 @@ service cloud.firestore {
       allow create: if clinic()
         && exists(/databases/$(database)/documents/siteSettings/main)
         && get(/databases/$(database)/documents/siteSettings/main).data.enrollmentEnabled == true
-        && request.resource.data.keys().hasOnly(['clinicCode','patientCode','age','sex','diabetesYears','createdBy','createdAt'])
-        && request.resource.data.keys().hasAll(['clinicCode','patientCode','age','sex','diabetesYears','createdBy','createdAt'])
+        && request.resource.data.keys().hasOnly(['clinicCode','patientCode','age','sex','diabetesYears','history','diagnoses','otherDiagnoses','medications','createdBy','createdAt'])
+        && request.resource.data.keys().hasAll(['clinicCode','patientCode','age','sex','diabetesYears','history','diagnoses','otherDiagnoses','medications','createdBy','createdAt'])
+        && validMedicalProfile(request.resource.data)
         && request.resource.data.clinicCode == myClinic()
         && request.resource.data.patientCode.matches('^[A-Z0-9_-]{3,24}$')
         && patientId == request.resource.data.clinicCode + '_' + request.resource.data.patientCode
@@ -120,7 +138,16 @@ service cloud.firestore {
         && request.resource.data.diabetesYears <= 100
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time;
-      allow update, delete: if false;
+      // Clinic staff may update medical background without changing the
+      // coded identity, clinic, demographics or existing visit records.
+      allow update: if sameClinic(resource.data.clinicCode)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'history','diagnoses','otherDiagnoses','medications','updatedBy','updatedAt'
+        ])
+        && validMedicalProfile(request.resource.data)
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
 
       match /visits/{visitId} {
         allow get, list: if admin()
@@ -129,8 +156,8 @@ service cloud.firestore {
           && get(patientPath(patientId)).data.clinicCode == myClinic()
           && visitId in ['baseline','month3','month6']
           && previousVisitExists(patientId,visitId)
-          && request.resource.data.keys().hasOnly(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','notes','updatedBy','updatedAt'])
-          && request.resource.data.keys().hasAll(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','notes','updatedBy','updatedAt'])
+          && request.resource.data.keys().hasOnly(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','diagnosis','notes','updatedBy','updatedAt'])
+          && request.resource.data.keys().hasAll(['phase','date','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','diagnosis','notes','updatedBy','updatedAt'])
           && request.resource.data.phase == visitId
           && request.resource.data.date is string
           && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -147,6 +174,8 @@ service cloud.firestore {
           && request.resource.data.adverseEvent.size() <= 400
           && request.resource.data.medicationChanges is string
           && request.resource.data.medicationChanges.size() <= 400
+          && request.resource.data.diagnosis is string
+          && request.resource.data.diagnosis.size() <= 400
           && request.resource.data.notes is string
           && request.resource.data.notes.size() <= 400
           && request.resource.data.updatedBy == request.auth.uid
