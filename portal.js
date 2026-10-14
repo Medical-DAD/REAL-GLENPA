@@ -11,6 +11,7 @@ const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
 // Using this app's Firebase Auth domain avoids needing real staff email addresses.
 const INTERNAL_CLINIC_DOMAIN='glenpa-real.firebaseapp.com';
 
+const ADMIN_PAGE=document.body.dataset.portal==='admin';
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
 const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,selectedClinic:null,visitDocs:new Map(),patientNames:new Map(),nameDirectoryReady:false,bulkRows:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
@@ -33,14 +34,28 @@ function updateLanguage(){
  $('signout').textContent=t('Sign out','تسجيل الخروج');
  $('welcomeTitle').textContent=t('Clinical study, connected.','دراستك السريرية، في منصة واحدة.');
  $('welcomeDesc').textContent=t('Secure access for participating clinics. Study records are synchronized through the research database.','دخول مخصص للعيادات المشاركة، وسجلات دراسة متصلة بقاعدة البيانات.');
- $('metricClinics').textContent=t('Participating clinics','عيادة مشاركة');$('metricVisits').textContent=t('Study visits','زيارات الدراسة');
- $('loginTitle').textContent=t('Login','تسجيل الدخول');$('loginDesc').textContent=t('Access your assigned study workspace.','ادخل إلى مساحة العمل المخصصة لعيادتك.');
+ $('loginTitle').textContent=ADMIN_PAGE?t('Administrator login','دخول مسؤول الدراسة'):t('Login','تسجيل الدخول');
+ $('loginDesc').textContent=ADMIN_PAGE?t('Authorized Medical Affairs access only.','دخول مخصص للمخولين من القسم الطبي فقط.'):t('Access your assigned study workspace.','ادخل إلى مساحة العمل المخصصة لعيادتك.');
  $('usernameLabel').textContent=t('Username','اسم المستخدم');$('passwordLabel').textContent=t('Password','كلمة المرور');
- $('loginButton').textContent=t('Enter portal →','دخول بوابة الدراسة ←');
+ $('loginButton').textContent=ADMIN_PAGE?t('Open admin dashboard →','فتح لوحة الأدمن ←'):t('Enter portal →','دخول بوابة الدراسة ←');
  $('adminTitle').textContent=t('Administrator Access','دخول مسؤول الدراسة');
  $('adminUsernameLabel').textContent=t('Username','اسم المستخدم');$('adminPasswordLabel').textContent=t('Password','كلمة المرور');
  $('adminLoginButton').textContent=t('Access dashboard →','الدخول إلى لوحة الإدارة ←');
  if(isAuthorized())render();
+}
+function showLoader(message){
+ const screen=$('pageLoader');
+ if(!screen)return;
+ const text=$('loaderMessage');
+ if(text)text.textContent=message||t('Connecting securely to your study workspace…','جارٍ الاتصال الآمن بمساحة الدراسة…');
+ screen.classList.remove('is-hidden');
+ screen.setAttribute('aria-busy','true');
+}
+function hideLoader(){
+ const screen=$('pageLoader');
+ if(!screen)return;
+ screen.classList.add('is-hidden');
+ screen.setAttribute('aria-busy','false');
 }
 function setBusy(id,bool){const el=$(id);if(el)el.disabled=bool}
 function errorMessage(err){
@@ -65,7 +80,7 @@ async function login(username,password,admin){
 function renderNav(){
  const links=isAdmin()?[
  ['overview',t('Overview','نظرة عامة')],['clinics',t('Clinics','العيادات')],['patients',t('Study records','سجلات الدراسة')],['users',t('Users','المستخدمون')],['settings',t('Settings','الإعدادات')],['qr','QR Code']]:
- [['overview',t('My clinic','عيادتي')],['patients',t('Study records','سجلات الدراسة')],['account',t('My account','حسابي')],['contact',t('Contact Us','اتصل بنا')]];
+ [['patients',t('Study records','سجلات الدراسة')],['contact',t('Contact Us','اتصل بنا')]];
  $('nav').innerHTML=links.map(([key,name])=>'<button type="button" data-nav="'+key+'" class="'+(current.view===key?'active':'')+'">'+esc(name)+'</button>').join('');
 }
 function render(){
@@ -90,7 +105,7 @@ function panel(title,body){return '<section class="panel"><h2>'+title+'</h2>'+bo
 function metric(title,value){return '<article class="metric"><small>'+title+'</small><b class="tabular">'+value+'</b></article>'}
 function overview(){
  const cnt=current.patients.length,all=current.clinics.length;
- return '<div class="grid">'+metric(t('Enrolled coded records','السجلات المرمّزة المسجلة'),cnt)+metric(t('Participating clinics','العيادات المشاركة'),all)+metric(t('Study visits','زيارات الدراسة'),'03')+'</div>'+
+ return '<div class="grid">'+metric(t('Enrolled coded records','السجلات المرمّزة المسجلة'),cnt)+metric(t('Participating clinics','العيادات المشاركة'),all)+'</div>'+
  panel(t('Research data workspace','مساحة بيانات الدراسة'),
  '<p class="muted">'+t('All clinical records here are retrieved from Firestore. Access to each clinic is restricted by database authorization rules.','تُقرأ سجلات الدراسة مباشرة من Firestore، وتُفرض صلاحيات كل عيادة من قواعد قاعدة البيانات.')+'</p>'+
  '<div class="actions"><button class="cta" data-nav="patients">'+t('Open study records','فتح سجلات الدراسة')+'</button>'+
@@ -364,7 +379,8 @@ function renderQR(){
  ctx.font='25px system-ui';ctx.fillText('medical-dad.github.io/REAL-GLENPA',480,1120);
 }
 async function loadRecords(){
- if(!isAuthorized())return;
+ if(!isAuthorized()){hideLoader();return}
+ showLoader(t('Synchronizing study records…','جارٍ مزامنة سجلات الدراسة…'));
  try{
   const cs=isAdmin()?await getDocs(collection(db,'clinics')):null;
   const own=isClinic()?await getDoc(doc(db,'clinics',clinicKey())):null;
@@ -391,7 +407,7 @@ async function loadRecords(){
   current.ready=false;status(errorMessage(e),'error');
   $('view').innerHTML=panel(t('Configuration required','الإعدادات المطلوبة'),
     '<p>'+t('The authenticated study backend has not been enabled for this account. No records are stored locally or substituted with fabricated content.','الخادم المعتمد للدراسة غير مفعّل لهذا الحساب. لا تُحفظ سجلات محليًا ولا تُستبدل ببيانات مصطنعة.')+'</p>');
- }
+ }finally{hideLoader()}
 }
 function eligiblePatientWrite(patient){
  return isClinic()&&patient.clinicCode===clinicKey();
@@ -812,7 +828,9 @@ async function downloadQR(){
 }
 async function safeAction(job){
  if(current.busy)return;current.busy=true;
- try{await job()}catch(e){status(errorMessage(e),'error')}finally{current.busy=false}
+ const show=job!==importClinicWorkbook;
+ if(show)showLoader(t('Saving securely…','جارٍ الحفظ بشكل آمن…'));
+ try{await job()}catch(e){status(errorMessage(e),'error')}finally{current.busy=false;if(show)hideLoader()}
 }
 async function handleClick(e){
  const nav=e.target.closest('[data-nav]');if(nav){current.view=nav.dataset.nav;current.patient=null;current.selectedClinic=null;current.visitDocs=new Map();render();return}
@@ -898,38 +916,32 @@ $('signout').onclick=()=>safeAction(async()=>{await signOut(auth);current.profil
 $('loginForm').onsubmit=e=>{
  e.preventDefault();
  safeAction(async()=>{setBusy('loginButton',true);try{
-  await login($('username').value,$('password').value,false);
+  showLoader(t('Verifying your credentials…','جارٍ التحقق من بيانات الدخول…'));
+  await login($('username').value,$('password').value,ADMIN_PAGE);
   $('password').value='';$('authMessage').textContent='';
  }catch(err){$('authMessage').textContent=errorMessage(err)}finally{setBusy('loginButton',false)}});
 };
-const overlay=$('adminOverlay');let taps=0,startTaps=0;
-function openAdmin(){overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');$('adminMessage').textContent='';$('adminPassword').focus()}
-function closeAdmin(){overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');$('adminPassword').value=''}
-$('brand').onclick=()=>{const now=Date.now();if(now-startTaps>4500){taps=0;startTaps=now}if(++taps===5){taps=0;openAdmin()}};
-$('closeAdmin').onclick=closeAdmin;overlay.onclick=e=>{if(e.target===overlay)closeAdmin()};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.classList.contains('hidden'))closeAdmin()});
-$('adminLoginForm').onsubmit=e=>{
- e.preventDefault();
- safeAction(async()=>{setBusy('adminLoginButton',true);try{
-  await login($('adminUsername').value,$('adminPassword').value,true);
-  $('adminMessage').textContent='';closeAdmin();
- }catch(err){$('adminMessage').textContent=errorMessage(err)}finally{setBusy('adminLoginButton',false)}});
-};
+$('brand').onclick=()=>{if(ADMIN_PAGE)window.location.assign('./index.html')};
 onAuthStateChanged(auth,async user=>{
  current.user=user;current.profile=null;current.patient=null;current.patients=[];current.clinics=[];current.users=[];current.ready=false;
- if(!user){render();return}
+ if(!user){render();hideLoader();return}
+ showLoader(t('Checking access permissions…','جارٍ التحقق من صلاحيات الدخول…'));
  try{
   const profile=await getDoc(doc(db,'userProfiles',user.uid));
   if(!profile.exists())throw Error('No study access profile has been provisioned for this account.');
   const p=profile.data();
   if(p.active!==true||!['clinic','study_oversight'].includes(p.role)||p.role==='clinic'&&!validClinic(p.clinicCode)||p.role==='study_oversight'&&p.username!=='msl.admin')throw Error('Inactive or invalid study access profile.');
-  current.profile=p;current.view='overview';render();await loadRecords();
- }catch(e){await signOut(auth);status(errorMessage(e),'error')}
+  // Dedicated administrator route. Do not mix clinic and admin navigation.
+  if(p.role==='study_oversight'&&!ADMIN_PAGE){window.location.replace('./admin.html');return}
+  if(p.role==='clinic'&&ADMIN_PAGE){window.location.replace('./index.html');return}
+  current.profile=p;current.view=isAdmin()?'overview':'patients';render();await loadRecords();
+ }catch(e){await signOut(auth);status(errorMessage(e),'error');hideLoader()}
 });
 settingsTheme();updateLanguage();render();
 
 /* Mobile installation retains the prior standalone app invitation. */
 (function installShortcut(){
+ if(ADMIN_PAGE)return;
  const invitation=$('installInvite'),guide=$('installGuide');
  const installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||matchMedia('(max-width:819px) and (pointer:coarse)').matches;
