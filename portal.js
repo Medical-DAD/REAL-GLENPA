@@ -3,7 +3,7 @@ import{initializeApp,deleteApp}from'https://www.gstatic.com/firebasejs/11.10.0/f
 import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,deleteUser,setPersistence,browserSessionPersistence}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import{getFirestore,doc,getDoc,getDocs,collection,query,where,setDoc,updateDoc,writeBatch,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import{firebaseConfig}from'./firebase-config.js';
-import{downloadClinicTemplate,readClinicTemplate}from'./excel-lite.js';
+import{downloadClinicTemplate,readClinicTemplate}from'./excel-lite.js?v=20261014-excel-fix-v3';
 
 const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
 const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
