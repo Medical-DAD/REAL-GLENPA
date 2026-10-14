@@ -41,7 +41,7 @@ test('new patient Baseline is required by Firestore and clinic isolation remains
 test('CSV preserves patient clinical history, medicines and all visits',()=>{
  const csv=section('async function exportCodedCSV(){','async function downloadQR(){');
  for(const col of ['medicalHistory','comorbidities','baselineMedications','newDiagnoses','adverseEvent','clinicalNotes'])assert.ok(csv.includes(col));
- assert.ok(html.includes('portal.js?v=20261014-private-directory-v2'));
+ assert.ok(html.includes('portal.js?v=20261014-names-only-v1'));
 });
 
 test('rendered patient chart displays conditions, baseline medicines and visit history',()=>{
@@ -75,6 +75,7 @@ test('rendered patient chart displays conditions, baseline medicines and visit h
  };
  ui.current.patient=patient.id;ui.current.view='patients';
  const html=ui.patientView(patient);
+ assert.ok(!html.includes('PT01'),'Patient code must not appear visually on patient details.');
  for(const phrase of ['Female','Medical history','Type 2 diabetes','Hypertension','Metformin','Visit history']){
   assert.ok(html.includes(phrase),'Rendered chart missing: '+phrase);
  }
@@ -92,4 +93,16 @@ test('rendered patient chart displays conditions, baseline medicines and visit h
    assert.ok(cards.includes(phrase),'History missing '+phrase);
   assert.equal(lookup('patientVisitCount').textContent,'3 / 3');
  });
+});
+
+test('names-only patient interface never shows a generated code in headings, cards or search labels',()=>{
+ const list=section('function patientsView(){','function clinicalFact(');
+ const chart=section('function patientView(p){','function usersView(){');
+ const visit=section('function openVisitForm(patient,phase){','async function createClinicAccount(');
+ assert.ok(!list.includes('esc(p.patientCode)'));
+ assert.ok(!chart.includes('esc(p.patientCode)'));
+ assert.ok(!visit.includes('esc(patient.patientCode)'));
+ assert.ok(!list.includes('Study reference'));
+ assert.ok(!chart.includes('Coded study ID'));
+ assert.ok(app.includes("return entry?entry.firstName+' '+entry.lastName:t('Patient name not recorded','اسم المريض غير مسجل')"));
 });
