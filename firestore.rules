@@ -77,9 +77,26 @@ service cloud.firestore {
         && request.resource.data.username.matches('^[a-z0-9._-]{3,40}$')
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time;
+      // Administrators can deactivate clinic accounts or revoke access permanently
+      // from the study directory. Authentication accounts remain managed locally.
       allow update: if admin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
-        && request.resource.data.active is bool;
+        && userId != request.auth.uid
+        && resource.data.role == 'clinic'
+        && (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
+            && request.resource.data.active is bool
+            && resource.data.get('removed', false) != true
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','removed','removedBy','removedAt'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasAll(['active','removed','removedBy','removedAt'])
+            && request.resource.data.active == false
+            && request.resource.data.removed == true
+            && request.resource.data.removedBy == request.auth.uid
+            && request.resource.data.removedAt == request.time
+          )
+        );
       allow delete: if false;
     }
 
