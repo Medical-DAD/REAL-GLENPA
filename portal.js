@@ -56,7 +56,7 @@ async function login(username,password,admin){
 function renderNav(){
  const links=isAdmin()?[
  ['overview',t('Overview','نظرة عامة')],['clinics',t('Clinics','العيادات')],['patients',t('Study records','سجلات الدراسة')],['users',t('Users','المستخدمون')],['settings',t('Settings','الإعدادات')],['qr','QR Code']]:
- [['overview',t('My clinic','عيادتي')],['patients',t('Study records','سجلات الدراسة')],['account',t('My account','حسابي')]];
+ [['overview',t('My clinic','عيادتي')],['patients',t('Study records','سجلات الدراسة')],['account',t('My account','حسابي')],['contact',t('Contact Us','اتصل بنا')]];
  $('nav').innerHTML=links.map(([key,name])=>'<button type="button" data-nav="'+key+'" class="'+(current.view===key?'active':'')+'">'+esc(name)+'</button>').join('');
 }
 function render(){
@@ -66,13 +66,13 @@ function render(){
  if(!isAuthorized())return;
  renderNav();
  $('scopeCaption').textContent=isAdmin()?t('STUDY OVERSIGHT','الإشراف على الدراسة'):t('PARTICIPATING CLINIC','العيادة المشاركة');
- const label={overview:t('Study overview','نظرة عامة على الدراسة'),clinics:t('Participating clinics','العيادات المشاركة'),patients:t('Patient records','سجلات المرضى'),users:t('Access management','إدارة المستخدمين'),settings:t('Study settings','إعدادات الدراسة'),qr:'QR Code',account:t('My account','حسابي')};
+ const label={overview:t('Study overview','نظرة عامة على الدراسة'),clinics:t('Participating clinics','العيادات المشاركة'),patients:t('Patient records','سجلات المرضى'),users:t('Access management','إدارة المستخدمين'),settings:t('Study settings','إعدادات الدراسة'),qr:'QR Code',account:t('My account','حسابي'),contact:t('Contact Us','اتصل بنا')};
  $('sectionTitle').textContent=label[current.view]||label.overview;
  $('sectionSub').textContent=isAdmin()?t('Authorized medical affairs workspace','مساحة الإشراف الطبي المخوّلة'):
    (current.clinics.find(c=>c.id===clinicKey())?.doctorName||clinicKey());
  $('roleBadge').textContent=isAdmin()?t('Study administrator','مسؤول الدراسة'):t('Clinic account','حساب العيادة');
  if(!current.ready){$('view').innerHTML=panel(t('Connecting to study database','جارٍ الاتصال بقاعدة بيانات الدراسة'),'<p>'+t('Clinical functions remain unavailable until the database permission checks complete.','تبقى الوظائف السريرية غير متاحة حتى يكتمل التحقق من صلاحيات قاعدة البيانات.')+'</p>');return;}
- const views={overview:overview,clinics:clinicsView,patients:patientsView,users:usersView,settings:settingsView,qr:qrView,account:accountView};
+ const views={overview:overview,clinics:clinicsView,patients:patientsView,users:usersView,settings:settingsView,qr:qrView,account:accountView,contact:contactView};
  $('view').innerHTML=(views[current.view]||overview)();
  if(current.view==='qr')setTimeout(renderQR,0);
 }
@@ -150,6 +150,14 @@ function accountView(){
  '<p>'+t('Username','اسم المستخدم')+': <b>'+esc(current.profile.username)+'</b></p>'+
  '<p>'+t('Clinic','العيادة')+': <b>'+esc(clinicKey())+'</b></p>'+
  '<div class="security-note">'+t('To change your own password, use the account recovery process approved for your organization.','لتغيير كلمة المرور اتبع إجراءات استعادة الحساب المعتمدة لدى مؤسستك.')+'</div>');
+}
+function contactView(){
+ return panel(t('Medical Department · Clinic Support','القسم الطبي · دعم العيادات'),
+ '<p>'+t('For study coordination, operational questions and technical assistance, please contact:','للتنسيق بخصوص الدراسة والاستفسارات التشغيلية والمساعدة التقنية، يرجى التواصل مع:')+'</p>'+
+ '<p><b>Tareq M. Jrab</b><br>'+t('Regional Medical Science Liaison','مسؤول الارتباط العلمي الطبي الإقليمي')+'</p>'+
+ '<p>'+t('Office','هاتف المكتب')+': <a href="tel:+96262222200">+962 6 2222200</a> '+t('extension','تحويلة')+' 779</p>'+
+ '<p>'+t('Mobile','هاتف محمول')+': <a href="tel:+962770078453">+962 77 0078453</a></p>'+
+ '<p><a href="https://www.dadgroup.com/" target="_blank" rel="noopener noreferrer">dadgroup.com</a></p>');
 }
 function renderQR(){
  const c=$('qrCanvas');if(!c)return;
@@ -379,3 +387,31 @@ onAuthStateChanged(auth,async user=>{
  }catch(e){await signOut(auth);status(errorMessage(e),'error')}
 });
 settingsTheme();updateLanguage();render();
+
+/* Mobile installation retains the prior standalone app invitation. */
+(function installShortcut(){
+ const invitation=$('installInvite'),guide=$('installGuide');
+ const installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||matchMedia('(max-width:819px) and (pointer:coarse)').matches;
+ const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+ let deferred=null;
+ function hide(){invitation.classList.add('hidden');try{sessionStorage.setItem('glenpa-install-dismissed','1')}catch(e){}}
+ function guideOpen(){
+  $('installGuideTitle').textContent=t('Install GLENPA REAL','تثبيت تطبيق جلينبا REAL');
+  $('installGuideText').textContent=ios?t('Open in Safari → Share → Add to Home Screen → Add.','افتح الموقع عبر Safari ثم مشاركة ← إضافة إلى الشاشة الرئيسية ← إضافة.'):
+   t('Open the browser menu (⋮), then choose Install App or Add to Home Screen.','افتح قائمة المتصفح (⋮) ثم اختر تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.');
+  $('installGuideClose').textContent=t('Got it','فهمت');
+  guide.classList.remove('hidden');guide.setAttribute('aria-hidden','false');
+ }
+ if(mobile&&!installed){let dismissed=false;try{dismissed=sessionStorage.getItem('glenpa-install-dismissed')==='1'}catch(e){}if(!dismissed)invitation.classList.remove('hidden')}
+ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;if(mobile&&!installed)invitation.classList.remove('hidden')});
+ $('installDismiss').onclick=hide;
+ $('installButton').onclick=async()=>{
+  if(deferred){const event=deferred;deferred=null;try{await event.prompt();if((await event.userChoice).outcome==='accepted'){hide();return}}catch(e){}}
+  guideOpen();
+ };
+ $('installGuideClose').onclick=()=>{guide.classList.add('hidden');guide.setAttribute('aria-hidden','true')};
+ guide.addEventListener('click',e=>{if(e.target===guide)$('installGuideClose').click()});
+ window.addEventListener('appinstalled',hide);
+})();
+
