@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#103447">
+<meta name="referrer" content="no-referrer"><meta http-equiv="Cache-Control" content="no-store">
+<title>GLENPA REAL | Administrator</title>
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap">
+<link rel="stylesheet" href="./portal.css?v=20261014-clinic-oversight-20-v1">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="module" src="./portal.js?v=20261014-clinic-oversight-20-v1"></script>
+</head><body data-portal="admin">
+<div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-label="Loading GLENPA REAL">
+ <div class="page-loader-content">
+  <div class="loader-mark"><img src="./apple-touch-icon.png" alt="" width="62" height="62"><span class="loader-orbit loader-orbit-one"></span><span class="loader-orbit loader-orbit-two"></span></div>
+  <strong>GLENPA <em>REAL</em></strong>
+  <span class="loader-subtitle">MEDICAL AFFAIRS · STUDY PORTAL</span>
+  <div class="loader-progress" aria-hidden="true"><span></span></div>
+  <p id="loaderMessage">Connecting securely to your study workspace…</p>
+ </div>
+</div>
+<header class="topbar"><button id="brand" class="brand" type="button" aria-label="GLENPA REAL"><img src="./apple-touch-icon.png" alt="" width="42" height="42"><span><strong>GLENPA <em>REAL</em></strong><small>MEDICAL AFFAIRS · STUDY PORTAL</small></span></button>
+<div class="toptools"><button id="theme" class="quiet" type="button" title="Change theme">◑</button><button id="language" class="quiet" type="button">العربية</button><button id="signout" class="quiet hidden" type="button">Sign out</button></div></header>
+<aside id="installInvite" class="install-invite hidden" aria-label="Install GLENPA REAL">
+<img src="./apple-touch-icon.png" width="48" height="48" alt="" class="install-icon">
+<div class="install-text"><b>GLENPA REAL</b><span id="installSubtitle">Add the study portal to your home screen</span></div>
+<button id="installButton" class="install-btn" type="button">↓ نزّل التطبيق</button>
+<button id="installDismiss" class="install-x" type="button" aria-label="Dismiss">×</button>
+</aside>
+<div id="installGuide" class="overlay hidden" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="installGuideTitle"><h2 id="installGuideTitle">Install GLENPA REAL</h2><p id="installGuideText"></p><button id="installGuideClose" type="button" class="cta">Got it</button></div></div>
+<main id="workspace" class="shell">
+<div id="globalStatus" class="notice hidden" role="status" aria-live="polite"></div>
+<section id="authScreen" class="auth-layout">
+<div class="welcome"><span class="eyebrow">GLENPA REAL · REAL-WORLD EVIDENCE</span><h1 id="welcomeTitle">Study administration, securely connected.</h1><p id="welcomeDesc">Administrator oversight, clinic account management, study records and enrollment progress.</p></div>
+<form id="loginForm" class="panel auth-form"><div class="eyebrow teal">STUDY ADMINISTRATION</div><h2 id="loginTitle">Administrator login</h2><p id="loginDesc" class="muted">Authorized Medical Affairs access only.</p>
+<label><span id="usernameLabel">Username</span><input id="username" autocomplete="username" required value="msl.admin" readonly maxlength="40"></label>
+<label><span id="passwordLabel">Password</span><input id="password" type="password" autocomplete="current-password" required></label>
+<button id="loginButton" class="cta" type="submit">Open admin dashboard →</button><p class="form-status" id="authMessage" aria-live="polite"></p></form>
+</section>
+<section id="appScreen" class="hidden">
+<div class="section-head"><div><div id="scopeCaption" class="eyebrow teal"></div><h1 id="sectionTitle">Study overview</h1><p id="sectionSub" class="muted"></p></div><div class="head-actions"><span id="roleBadge" class="chip"></span></div></div>
+<nav id="nav" class="nav" aria-label="Workspace navigation"></nav>
+<div id="view" class="view"></div>
+</section>
+<footer>GLENPA REAL · DAR ALDAWA · MEDICAL AFFAIRS</footer>
+</main>
+</body></html>
