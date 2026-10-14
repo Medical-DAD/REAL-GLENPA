@@ -27,3 +27,10 @@
 @keyframes glAdminUp{from{opacity:0;transform:translateY(15px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:540px){.gl-login-layout{margin:17px auto}.gl-login-card{padding:23px}.gl-admin-modal{padding:25px}}
 @media(prefers-reduced-motion:reduce){.gl-admin-modal{animation:none}}
+
+/* Username-first administrator modal */
+.gl-admin-user-field input[readonly]{font-weight:850;letter-spacing:.03em;opacity:1;cursor:default;background:var(--pale);color:var(--text);border-color:var(--line)}
+.gl-admin-user-field input[readonly]:focus{outline:none}
+.gl-admin-email-step[hidden],#glAdminLinkArea[hidden]{display:none!important}
+#glAdminChangeEmail{display:block;margin:13px auto 0!important;text-align:center;line-height:1.5;cursor:pointer}
+.gl-admin-modal .gl-login-status:not(:empty){margin-top:12px}
