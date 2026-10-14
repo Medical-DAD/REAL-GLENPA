@@ -231,7 +231,7 @@ function usersView(){
  '<div class="actions"><button type="button" class="secondary" id="downloadClinicXlsx">'+t('Download Excel template','تنزيل قالب Excel')+'</button>'+
  '<label class="file-button">'+t('Choose completed Excel file','اختيار ملف Excel المعبّأ')+'<input id="clinicWorkbookFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>'+
  '<button type="button" class="cta" id="importClinicWorkbook" disabled>'+t('Import clinic accounts','استيراد حسابات العيادات')+'</button></div>'+
- '<p id="clinicWorkbookStatus" class="muted" aria-live="polite"></p>'+
+ '<p id="clinicWorkbookStatus" class="muted" aria-live="polite">'+t('No Excel file selected yet.','لم يتم اختيار ملف Excel بعد.')+'</p>'+
  '<p class="help">'+t('Excel contains PINs in plain text: keep it private and delete it after import. Existing users are not reset by import.','ملف Excel يحتوي الأرقام السرية بنص واضح. احتفظ به بشكل خاص واحذفه بعد الاستيراد. الاستيراد لا يغيّر كلمات مرور الحسابات الموجودة.')+'</p></div>'+
  '<p class="help"><a href="https://github.com/Medical-DAD/REAL-GLENPA/blob/main/ADMIN_USERS_GUIDE_AR.md" target="_blank" rel="noopener noreferrer">'+t('Local password reset and permanent account deletion instructions','تعليمات تغيير كلمة المرور والحذف النهائي على جهاز الأدمن')+'</a></p>'+ 
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
@@ -618,26 +618,57 @@ function verifyClinicWorkbook(rows){
   codes.add(clinic);users.add(u);
  }
 }
+function workbookStatus(message,kind='info'){
+ const box=$('clinicWorkbookStatus');
+ if(box){
+  box.textContent=message;
+  box.style.color=kind==='error'?'#bd3b35':kind==='success'?'#257b69':'';
+  box.setAttribute('role',kind==='error'?'alert':'status');
+ }
+}
+function workbookImportState(working){
+ const button=$('importClinicWorkbook');
+ if(!button)return;
+ button.disabled=working||!current.bulkRows?.length;
+ button.textContent=working?t('Importing accounts…','جارٍ استيراد الحسابات…'):t('Import clinic accounts','استيراد حسابات العيادات');
+}
 async function prepareClinicWorkbook(file){
  if(!isAdmin())throw Error('Not authorized');
+ if(current.bulkRows)for(const row of current.bulkRows)row.password='';
  current.bulkRows=null;
- const rows=await readClinicTemplate(file);
- verifyClinicWorkbook(rows);
- current.bulkRows=rows;
- const box=$('clinicWorkbookStatus'),button=$('importClinicWorkbook');
- if(box)box.textContent=t('Ready to create ','جاهز لإنشاء ')+rows.length+t(' clinic account(s). Review the file and click Import. Existing usernames will be skipped.',' حساب عيادة. راجع الملف ثم اضغط استيراد. سيتم تخطي أسماء المستخدمين الموجودة.');
- if(button)button.disabled=false;
+ workbookImportState(false);
+ workbookStatus(t('Reading ','قراءة ')+file.name+'…');
+ try{
+  const rows=await readClinicTemplate(file);
+  verifyClinicWorkbook(rows);
+  current.bulkRows=rows;
+  workbookImportState(false);
+  workbookStatus(t('File ready: ','الملف جاهز: ')+file.name+' · '+rows.length+
+   t(' clinic account(s). Click Import to create them.',' حساب عيادة. اضغط استيراد لإنشائها.'),'success');
+ }catch(error){
+  const detail=String(error?.message||'Unable to read workbook').slice(0,260);
+  workbookStatus(t('Excel cannot be imported: ','تعذر قراءة Excel: ')+detail,'error');
+  workbookImportState(false);
+  throw error;
+ }
 }
 async function importClinicWorkbook(){
- if(!isAdmin()||!current.bulkRows?.length)throw Error('No Excel file selected');
- const rows=current.bulkRows;current.bulkRows=null;
- let created=0,skipped=0;
- const issues=[],progress=$('clinicWorkbookStatus');
- const log=(text)=>{if(progress)progress.textContent=text};
+ if(!isAdmin()||!current.bulkRows?.length){
+  workbookStatus(t('Please choose a completed Excel file first.','اختر ملف Excel معبأً أولاً.'),'error');
+  return;
+ }
+ const rows=current.bulkRows;
+ workbookImportState(true);
+ let created=0,skipped=0,failed=0;
+ const errors=[],started=Date.now();
+ const log=(msg,kind)=>workbookStatus(msg,kind);
  try{
-  for(const [index,row]of rows.entries()){
-   const clinicCode=String(row.clinicCode).trim().toLowerCase(),username=parseCode(row.username);
-   log(t('Processing row ','معالجة السطر ')+(index+1)+' / '+rows.length+' · '+clinicCode);
+  for(let index=0;index<rows.length;index++){
+   const row=rows[index],clinicCode=String(row.clinicCode).trim().toLowerCase(),username=parseCode(row.username);
+   log(t('Importing ','جارٍ إنشاء ')+(index+1)+' / '+rows.length+' · '+clinicCode+' · '+username+
+     t('  (this may take a few seconds per account)','  (قد يستغرق كل حساب عدة ثوانٍ)'));
+   // Yield to the UI frame before a Firestore/Auth network operation.
+   await new Promise(resolve=>requestAnimationFrame(resolve));
    if(current.users.some(u=>parseCode(u.username)===username)){skipped++;continue}
    try{
     const details={doctorName:String(row.doctorName).trim(),specialty:String(row.specialty).trim(),area:String(row.area).trim()};
@@ -647,18 +678,31 @@ async function importClinicWorkbook(){
     else await setDoc(clinicDoc,details);
     if(!current.clinics.some(c=>c.id===clinicCode))current.clinics.push({id:clinicCode,...details});
     await createClinicAccount({username,clinicCode,password:String(row.password)});
-    current.users.push({username,id:'created-'+index,role:'clinic',clinicCode,active:true});
+    current.users.push({username,id:'just-created-'+index,role:'clinic',clinicCode,active:true});
     created++;
-   }catch(err){
-    issues.push(clinicCode+' ('+username+'): '+String(err.message||'Failed').slice(0,130));
+   }catch(error){
+    failed++;errors.push(clinicCode+' / '+username+': '+String(error.message||'Failed').slice(0,120));
+    // A quota/rate-limit error cannot be fixed by trying the next 25 accounts.
+    if(/too-many-requests|too-many-attempts|quota-exceeded|resource-exhausted/i.test(String(error.code||'')+' '+String(error.message||''))){
+     errors.push(t('Firebase limit reached. Import remaining users later.','تم الوصول إلى حد Firebase. استكمل بقية المستخدمين لاحقاً.'));
+     break;
+    }
    }
   }
  }finally{
-  for(const row of rows)row.password=''; // Clear PINs from in-memory array immediately.
+  for(const row of rows)row.password='';
+  current.bulkRows=null;
+  workbookImportState(false);
  }
+ const elapsed=Math.round((Date.now()-started)/1000);
+ const summary=t('Import completed. Created: ','اكتمل الاستيراد. تم إنشاء: ')+created+
+  t(' · Already exists: ',' · موجود مسبقاً: ')+skipped+
+  t(' · Failed: ',' · فشل: ')+failed+' · '+elapsed+'s';
+ // Refresh the account directory, which recreates the Users panel.
  await loadRecords();
- const summary=t('Created: ','تم الإنشاء: ')+created+t(' · Skipped: ',' · تم التخطي: ')+skipped+t(' · Failed: ',' · تعذّر: ')+issues.length;
- status(summary+(issues.length?' · '+issues.join(' | '):''),issues.length?'error':'success');
+ workbookStatus(summary+(errors.length?'\n'+errors.join('\n'):''),errors.length?'error':'success');
+ if(errors.length)status(summary+' '+errors.join(' | ').slice(0,600),'error');
+ else status(summary);
 }
 async function updateSettings(form){
  if(!isAdmin())throw Error('Not authorized');
@@ -729,6 +773,7 @@ $('view').addEventListener('change',e=>{
  if(e.target.id!=='clinicWorkbookFile'||!isAdmin())return;
  const file=e.target.files?.[0];if(!file)return;
  e.target.value='';
+ // Errors must appear where the user selected the file, not only at the top of the portal.
  safeAction(async()=>await prepareClinicWorkbook(file));
 });
 $('view').addEventListener('input',e=>{
