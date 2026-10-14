@@ -347,7 +347,7 @@ async function enrollPatient(form){
  const namePattern=/^[\p{L}][\p{L}\p{M}'-]{1,59}$/u;
  if(!namePattern.test(firstName)||!namePattern.test(lastName))throw Error(t('Enter the first and last name as two separate words (2–60 characters each).','أدخل الاسم الأول واسم العائلة، كل واحد كلمة مستقلة من حرفين إلى 60 حرفًا.'));
  // Patient study identifiers are opaque and never need to be memorized by clinicians.
- const random=new Uint8Array(12);crypto.getRandomValues(random);
+ const random=new Uint8Array(10);crypto.getRandomValues(random); // P- + 20 hex chars = 22, within the Firestore limit
  const id='P-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
  const age=Number(f.get('age')),diabetesYears=Number(f.get('diabetesYears'));
  if(!Number.isInteger(age)||age<18||age>110||!Number.isFinite(diabetesYears)||diabetesYears<0||diabetesYears>100)throw Error(t('Invalid demographic or diabetes values.','قيم العمر أو مدة السكري غير صحيحة.'));
