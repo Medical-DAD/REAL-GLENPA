@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'portal.js'
+      - 'excel-lite.js'
+      - 'portal.css'
+      - 'tests/patient-directory-excel.test.mjs'
       - 'firestore.rules'
       - 'tests/clinical-history.test.cjs'
       - 'index.html'
@@ -22,6 +25,7 @@ jobs:
       - name: Validate syntax
         run: |
           node --check portal.js
+          node --check excel-lite.js
           node --check admin-tools/manage.cjs
       - name: Validate Spark user-management invariants
-        run: node --test tests/spark-users.test.cjs tests/clinical-history.test.cjs
+        run: node --test tests/spark-users.test.cjs tests/clinical-history.test.cjs tests/patient-directory-excel.test.mjs
