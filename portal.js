@@ -315,64 +315,131 @@ async function updateMedicalProfile(form,patient){
 }
 
 async function saveVisit(form,patient){
- if(!eligiblePatientWrite(patient))throw Error('Visit writing not authorized');
+ if(!eligiblePatientWrite(patient))throw Error(t('Only the assigned clinic may record a visit.','العيادة المسؤولة فقط يمكنها تسجيل زيارة.'));
  const f=new FormData(form),phase=String(f.get('phase'));
- if(!['baseline','month3','month6'].includes(phase))throw Error('Invalid phase');
+ if(!VISIT_PHASES.includes(phase))throw Error(t('Invalid visit type.','نوع الزيارة غير صحيح.'));
+ const visitRef=doc(db,'patients',patient.id,'visits',phase);
+ if((await getDoc(visitRef)).exists())throw Error(t('This visit is already recorded and cannot be overwritten.','هذه الزيارة مسجّلة سابقًا ولا يمكن استبدالها.'));
  const hba1c=Number(f.get('hba1c')),fpg=Number(f.get('fpg'));
  const egfr=f.get('egfr')===''?null:Number(f.get('egfr'));
  const weight=f.get('weight')===''?null:Number(f.get('weight'));
- if(hba1c<3||hba1c>20||!Number.isFinite(hba1c)||fpg<30||fpg>1000||!Number.isFinite(fpg)||
- (egfr!==null&&(!Number.isFinite(egfr)||egfr<0||egfr>200))||(weight!==null&&(!Number.isFinite(weight)||weight<1||weight>400)))throw Error('Invalid laboratory values');
+ if(!Number.isFinite(hba1c)||hba1c<3||hba1c>20||!Number.isFinite(fpg)||fpg<30||fpg>1000||
+ (egfr!==null&&(!Number.isFinite(egfr)||egfr<0||egfr>200))||
+ (weight!==null&&(!Number.isFinite(weight)||weight<1||weight>400)))throw Error(t('Check the entered laboratory and weight values.','راجع قيم التحاليل والوزن المدخلة.'));
  const date=String(f.get('date'));
- if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Invalid visit date');
- if(phase!=='baseline'){
-  const previous=phase==='month3'?'baseline':'month3';
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(new Date(date+'T12:00:00Z').valueOf()))throw Error(t('Enter a valid visit date.','أدخل تاريخ زيارة صحيحًا.'));
+ const previous=phase==='month3'?'baseline':phase==='month6'?'month3':null;
+ if(previous){
   const snap=await getDoc(doc(db,'patients',patient.id,'visits',previous));
-  if(!snap.exists())throw Error('Record the preceding visit first');
+  if(!snap.exists())throw Error(t('Record the previous scheduled visit first.','سجّل الزيارة السابقة أولًا.'));
   const previousDate=new Date(snap.data().date+'T12:00:00Z');
-  if(Number.isNaN(previousDate.valueOf()))throw Error('Invalid previous visit date');
+  if(Number.isNaN(previousDate.valueOf()))throw Error(t('The previous visit date is invalid.','تاريخ الزيارة السابقة غير صحيح.'));
   previousDate.setUTCMonth(previousDate.getUTCMonth()+3);
-  if(date<previousDate.toISOString().slice(0,10))throw Error('At least 3 calendar months must separate study visits.');
+  if(date<previousDate.toISOString().slice(0,10))throw Error(t('Follow-up visits require at least 3 calendar months after the previous visit.','زيارة المتابعة تتطلب 3 أشهر تقويمية على الأقل بعد الزيارة السابقة.'));
  }
- const payload={phase,date,hba1c,fpg,egfr,weight,dose:String(f.get('dose')),
- adverseEvent:String(f.get('adverseEvent')||'').slice(0,400),medicationChanges:String(f.get('medicationChanges')||'').slice(0,400),
- notes:String(f.get('notes')||'').slice(0,400),updatedBy:current.user.uid,updatedAt:serverTimestamp()};
- await setDoc(doc(db,'patients',patient.id,'visits',phase),payload);
- await showVisits(patient);status(t('Visit saved to Firestore.','تم حفظ الزيارة في Firestore.'));
+ const payload={
+  phase,date,hba1c,fpg,egfr,weight,dose:String(f.get('dose')),
+  adverseEvent:String(f.get('adverseEvent')||'').trim().slice(0,400),
+  medicationChanges:String(f.get('medicationChanges')||'').trim().slice(0,400),
+  diagnosis:String(f.get('diagnosis')||'').trim().slice(0,400),
+  notes:String(f.get('notes')||'').trim().slice(0,400),
+  updatedBy:current.user.uid,updatedAt:serverTimestamp()
+ };
+ await setDoc(visitRef,payload);
+ current.view='patients';current.patient=patient.id;
+ render();
+ status(t('Visit saved. The complete record is now in patient history.','تم حفظ الزيارة، وتفاصيلها موجودة الآن في سجل المريض.'));
+}
+function clinicalFact(label,value,suffix=''){
+ return '<div class="clinical-fact"><span>'+label+'</span><strong>'+showValue(value)+(value!==null&&value!==undefined&&String(value)!==''?suffix:'')+'</strong></div>';
 }
 async function showVisits(patient){
- const area=$('visitsArea');if(!area)return;
- try{const all=await getDocs(collection(db,'patients',patient.id,'visits'));
- const order=['baseline','month3','month6'];const records=all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
- area.innerHTML=records.map(v=>'<div class="security-note" style="margin-bottom:9px"><div class="row"><b>'+esc(v.phase)+'</b><span class="chip">'+esc(v.date)+'</span></div>'+
- '<div class="grid"><p><b>HbA1c</b><br>'+esc(v.hba1c)+'%</p><p><b>FPG</b><br>'+esc(v.fpg)+' mg/dL</p><p><b>eGFR</b><br>'+esc(v.egfr??'—')+'</p><p><b>Weight</b><br>'+esc(v.weight??'—')+' kg</p></div>'+
- '<p>'+t('Dose','الجرعة')+': '+esc(v.dose)+'</p><p>'+t('Adverse event','حدث ضار')+': '+esc(v.adverseEvent||'—')+'</p></div>').join('')||
- '<p class="muted">'+t('No visits recorded yet.','لم تُسجل أي زيارة بعد.')+'</p>';
- }catch(err){area.textContent=errorMessage(err)}
+ const container=$('visitsArea');
+ if(!container||current.patient!==patient.id)return;
+ try{
+  const result=await getDocs(collection(db,'patients',patient.id,'visits'));
+  if(current.patient!==patient.id||current.view!=='patients'||!$('visitsArea'))return;
+  const records=new Map(result.docs.map(d=>[d.id,d.data()]));
+  current.visitDocs=records;
+  const n=VISIT_PHASES.filter(phase=>records.has(phase)).length;
+  if($('patientVisitCount'))$('patientVisitCount').textContent=n+' / 3';
+  const canWrite=isClinic()&&patient.clinicCode===clinicKey();
+  $('visitsArea').innerHTML=VISIT_PHASES.map((phase,index)=>{
+   const v=records.get(phase),prior=index===0||records.has(VISIT_PHASES[index-1]);
+   const step='<span class="visit-step">'+(index+1)+'</span>';
+   if(!v)return '<article class="visit-card pending"><div class="visit-title-line">'+step+'<div><strong>'+visitLabel(phase)+'</strong><div class="muted">'+t('Not recorded yet','لم تُسجّل بعد')+'</div></div>'+
+    '<span class="visit-status">'+t('Pending','بانتظار التسجيل')+'</span></div>'+
+    (canWrite&&prior?'<button class="cta" type="button" data-addvisit="'+phase+'">'+t('Record this visit','تسجيل هذه الزيارة')+'</button>':
+     canWrite?'<p class="help">'+t('Record the preceding visit first.','سجّل الزيارة السابقة أولًا.')+'</p>':'')+
+    '</article>';
+   return '<details class="visit-card completed" open><summary class="visit-title-line">'+step+
+   '<div><strong>'+visitLabel(phase)+'</strong><div class="muted">'+showValue(v.date)+'</div></div>'+
+   '<span class="visit-status">'+t('Recorded','مسجّلة')+'</span></summary>'+
+   '<div class="visit-content"><div class="clinical-kv">'+
+    clinicalFact('HbA1c',v.hba1c,'%')+
+    clinicalFact(t('Fasting glucose','السكر الصائم'),v.fpg,' mg/dL')+
+    clinicalFact('eGFR',v.egfr,' mL/min/1.73m²')+
+    clinicalFact(t('Weight','الوزن'),v.weight,' kg')+
+    clinicalFact(t('Glenpa strength','تركيز جلينبا'),v.dose)+
+   '</div><div class="visit-notes">'+
+   '<div><b>'+t('Adverse events','الأحداث الضارة')+'</b><p>'+showValue(v.adverseEvent)+'</p></div>'+
+   '<div><b>'+t('Concomitant medication changes','التغييرات في الأدوية المصاحبة')+'</b><p>'+showValue(v.medicationChanges)+'</p></div>'+
+   '<div><b>'+t('New diagnoses / comorbidities','تشخيصات أو أمراض جديدة')+'</b><p>'+showValue(v.diagnosis)+'</p></div>'+
+   '<div><b>'+t('Clinical visit notes','ملاحظات الزيارة')+'</b><p>'+showValue(v.notes)+'</p></div>'+
+   '</div></div></details>';
+  }).join('');
+ }catch(err){
+  const target=$('visitsArea');
+  if(target&&current.patient===patient.id)target.textContent=errorMessage(err);
+ }
 }
 function openEnrollForm(){
- const markup='<form id="enrollForm"><p class="notice">'+t('Use only approved pseudonymous study IDs. Never enter a patient name, national ID or phone.','استخدم رمز دراسة مخصصًا للمريض فقط. لا تدخل أسماء المرضى أو أرقامهم الوطنية أو هواتفهم.')+'</p>'+
- '<div class="field-grid"><label>'+t('Unique study ID','رمز المريض المميز')+'<input name="patientCode" placeholder="CL01-001" maxlength="24" pattern="[A-Za-z0-9_-]{3,24}" required></label>'+
+ const markup='<form id="enrollForm">'+
+ '<div class="notice">'+t('Use a coded study ID only. After saving, open Baseline in this patient’s visit history.','استخدم رمز الدراسة فقط. بعد الحفظ افتح زيارة Baseline في سجل المريض.')+'</div>'+
+ '<h3>'+t('Diabetes demographics','بيانات مريض السكري')+'</h3>'+
+ '<div class="field-grid"><label>'+t('Unique study ID','رمز الدراسة المميز')+'<input name="patientCode" placeholder="CL01-001" maxlength="24" pattern="[A-Za-z0-9_-]{3,24}" required></label>'+
  '<label>'+t('Age','العمر')+'<input name="age" type="number" min="18" max="110" required></label>'+
  '<label>'+t('Sex','الجنس')+'<select name="sex"><option value="Male">'+t('Male','ذكر')+'</option><option value="Female">'+t('Female','أنثى')+'</option></select></label>'+
- '<label>'+t('Years with type 2 diabetes','سنوات الإصابة بالسكري من النوع الثاني')+'<input name="diabetesYears" type="number" min="0" max="100" required></label></div>'+
- '<div class="actions"><button type="submit" class="cta">'+t('Save patient','حفظ المريض')+'</button><button type="button" class="secondary" data-nav="patients">'+t('Cancel','إلغاء')+'</button></div></form>';
- $('view').innerHTML=panel(t('Patient enrollment','تسجيل المريض'),markup);
+ '<label>'+t('Years since type 2 diabetes diagnosis','سنوات الإصابة بالسكري من النوع الثاني')+'<input name="diabetesYears" type="number" min="0" max="100" step="1" required></label></div>'+
+ '<h3>'+t('Medical history · Comorbidities · Medication','التاريخ المرضي · الأمراض المصاحبة · الأدوية')+'</h3>'+
+ medicalFields()+
+ '<div class="actions"><button class="cta" type="submit">'+t('Save patient and open visit history','حفظ المريض وفتح سجل الزيارات')+'</button>'+
+ '<button class="secondary" type="button" data-nav="patients">'+t('Cancel','إلغاء')+'</button></div></form>';
+ $('view').innerHTML=panel(t('New patient · Diabetes profile','مريض جديد · ملف السكري'),markup);
 }
-function openVisitForm(patient){
- const fields='<form id="visitForm"><div class="field-grid"><label>'+t('Visit','الزيارة')+'<select name="phase"><option value="baseline">'+t('Baseline','الأساسية')+'</option><option value="month3">'+t('Month 3','الشهر الثالث')+'</option><option value="month6">'+t('Month 6','الشهر السادس')+'</option></select></label>'+
- '<label>'+t('Visit date','تاريخ الزيارة')+'<input type="date" name="date" required></label>'+
+function openMedicalProfileForm(patient){
+ if(!eligiblePatientWrite(patient))return;
+ $('view').innerHTML=panel(t('Edit medical history & baseline medicines','تعديل التاريخ المرضي والأدوية الأساسية'),
+ '<div class="actions"><button class="secondary" type="button" data-patient="'+esc(patient.id)+'">'+t('← Back to patient history','← العودة لسجل المريض')+'</button></div>'+
+ '<form id="medicalProfileForm"><input type="hidden" name="patientId" value="'+esc(patient.id)+'">'+
+ medicalFields(patient)+
+ '<div class="actions"><button type="submit" class="cta">'+t('Save medical profile','حفظ الملف الطبي')+'</button></div></form>');
+}
+function openVisitForm(patient,phase){
+ if(!eligiblePatientWrite(patient)||!VISIT_PHASES.includes(phase))return;
+ const previous=phase==='month3'?'baseline':phase==='month6'?'month3':null;
+ if(current.visitDocs?.has(phase))return status(t('This visit is already recorded.','هذه الزيارة مسجّلة مسبقًا.'),'error');
+ if(previous&&!current.visitDocs?.has(previous))return status(t('Complete the previous scheduled visit first.','أكمل الزيارة السابقة أولًا.'),'error');
+ const prior=previous?current.visitDocs.get(previous):null;
+ const context='<div class="security-note">'+t('The patient’s recorded history and medication profile remain in the chart. Enter only results and changes relevant to this visit.','تُحفظ بيانات المريض والأدوية الأساسية في الملف. سجّل نتائج وتغييرات هذه الزيارة فقط.')+
+ (prior?'<p>'+t('Previous visit: ','الزيارة السابقة: ')+visitLabel(previous)+' · '+showValue(prior.date)+' · HbA1c '+showValue(prior.hba1c)+'%</p>':'')+
+ '</div>';
+ const fields='<form id="visitForm"><input type="hidden" name="phase" value="'+phase+'">'+
+ '<div class="field-grid"><label>'+t('Visit date','تاريخ الزيارة')+'<input type="date" name="date" required></label>'+
  '<label>HbA1c (%)<input type="number" min="3" max="20" step=".1" name="hba1c" required></label>'+
- '<label>FPG (mg/dL)<input type="number" min="30" max="1000" step="1" name="fpg" required></label>'+
+ '<label>'+t('Fasting glucose (mg/dL)','سكر صائم (ملغم/دل)')+'<input type="number" min="30" max="1000" step="1" name="fpg" required></label>'+
  '<label>eGFR (mL/min/1.73m²)<input type="number" min="0" max="200" step=".1" name="egfr"></label>'+
  '<label>'+t('Weight (kg)','الوزن (كغم)')+'<input type="number" min="1" max="400" step=".1" name="weight"></label>'+
- '<label>'+t('Glenpa strength','تركيز جلينبا')+'<select name="dose"><option>10/5 mg</option><option>25/5 mg</option></select></label>'+
- '<label class="span2">'+t('Adverse event (coded, no identifiers)','حدث ضار (دون معرفات شخصية)')+'<textarea name="adverseEvent" maxlength="400"></textarea></label>'+
- '<label class="span2">'+t('Medication changes','التغييرات في الأدوية')+'<textarea name="medicationChanges" maxlength="400"></textarea></label>'+
- '<label class="span2">'+t('Clinical notes (no identifiers)','ملاحظات سريرية (دون معرفات)')+'<textarea name="notes" maxlength="400"></textarea></label></div>'+
- '<div class="actions"><button class="cta" type="submit">'+t('Save visit','حفظ الزيارة')+'</button><button type="button" class="secondary" data-patient="'+esc(patient.id)+'">'+t('Cancel','إلغاء')+'</button></div></form>';
- $('view').innerHTML=panel(t('Record visit for','تسجيل زيارة للمريض')+' '+esc(patient.patientCode),fields);
+ '<label>'+t('Glenpa strength','تركيز جلينبا')+'<select name="dose"><option value="10/5 mg">10/5 mg</option><option value="25/5 mg">25/5 mg</option></select></label>'+
+ '<label class="span2">'+t('Adverse events (coded, no identifiers)','الأحداث الضارة (بدون معلومات تعريفية)')+'<textarea name="adverseEvent" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('New, changed or stopped medicines','أدوية جديدة أو معدلة أو موقوفة')+'<textarea name="medicationChanges" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('New diagnoses / comorbidities','التشخيصات أو الأمراض المصاحبة الجديدة')+'<textarea name="diagnosis" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('Clinical notes','الملاحظات السريرية')+'<textarea name="notes" maxlength="400" rows="2"></textarea></label></div>'+
+ '<div class="actions"><button class="cta" type="submit">'+t('Save '+visitLabel(phase),'حفظ '+visitLabel(phase))+'</button>'+
+ '<button class="secondary" type="button" data-patient="'+esc(patient.id)+'">'+t('Cancel','إلغاء')+'</button></div></form>';
+ $('view').innerHTML=panel(visitLabel(phase)+' · '+esc(patient.patientCode),context+fields);
 }
+
 async function provisionUser(form){
  if(!isAdmin())throw Error('Not authorized');
  const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||'');
