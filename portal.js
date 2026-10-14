@@ -327,8 +327,14 @@ function getVisitValues(form,phase){
 }
 async function enrollPatient(form){
  if(!isClinic()||current.settings.enrollmentEnabled!==true)throw Error(t('Enrollment is disabled.','تسجيل المرضى متوقف حاليًا.'));
- const f=new FormData(form),id=String(f.get('patientCode')||'').trim().toUpperCase();
- if(!/^[A-Z0-9_-]{3,24}$/.test(id))throw Error(t('Study ID must be 3–24 letters, digits, underscores or hyphens.','رمز الدراسة يجب أن يتكون من 3 إلى 24 حرفًا أو رقمًا أو شرطة.'));
+ const f=new FormData(form);
+ const firstName=String(f.get('firstName')||'').trim();
+ const lastName=String(f.get('lastName')||'').trim();
+ const namePattern=/^[\p{L}][\p{L}\p{M}'-]{1,59}$/u;
+ if(!namePattern.test(firstName)||!namePattern.test(lastName))throw Error(t('Enter the first and last name as two separate words (2–60 characters each).','أدخل الاسم الأول واسم العائلة، كل واحد كلمة مستقلة من حرفين إلى 60 حرفًا.'));
+ // Patient study identifiers are opaque and never need to be memorized by clinicians.
+ const random=new Uint8Array(12);crypto.getRandomValues(random);
+ const id='P-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
  const age=Number(f.get('age')),diabetesYears=Number(f.get('diabetesYears'));
  if(!Number.isInteger(age)||age<18||age>110||!Number.isFinite(diabetesYears)||diabetesYears<0||diabetesYears>100)throw Error(t('Invalid demographic or diabetes values.','قيم العمر أو مدة السكري غير صحيحة.'));
  const medical=readMedicalFields(form);
@@ -341,6 +347,9 @@ async function enrollPatient(form){
  // Atomic write: both the patient profile and baseline must succeed together.
  const batch=writeBatch(db);
  batch.set(doc(db,'patients',patientId),payload);
+ batch.set(doc(db,'patientDirectory',patientId),{
+  clinicCode,firstName,lastName,createdBy:current.user.uid,createdAt:serverTimestamp()
+ });
  batch.set(doc(db,'patients',patientId,'visits','baseline'),baseline);
  await batch.commit();
  current.patient=patientId;current.view='patients';
@@ -420,17 +429,28 @@ async function showVisits(patient){
  }
 }
 function openEnrollForm(){
- const markup='<form id="enrollForm">'+
- '<div class="notice">'+t('Use a coded study ID only. Baseline is saved automatically when you register a new patient.','استخدم رمز الدراسة فقط. عند تسجيل المريض تُحفظ زيارة Baseline تلقائيًا.')+'</div>'+
- '<h3>'+t('Diabetes demographics','بيانات مريض السكري')+'</h3>'+
- '<div class="field-grid"><label>'+t('Unique study ID','رمز الدراسة المميز')+'<input name="patientCode" placeholder="CL01-001" maxlength="24" pattern="[A-Za-z0-9_-]{3,24}" required></label>'+
+ const form='<form id="enrollForm" class="patient-wizard">'+
+ '<div class="wizard-progress"><div class="wizard-progress-head"><span>'+t('New patient · Guided registration','مريض جديد · تسجيل بخطوات سهلة')+'</span><strong id="wizardProgressText">1 / 3</strong></div>'+
+ '<div class="wizard-track"><span id="wizardProgressFill" style="width:33.33%"></span></div></div>'+
+ '<section class="wizard-step" data-wizard-step="0">'+
+ '<div class="wizard-kicker">'+t('STEP 01 · PATIENT','الخطوة 01 · المريض')+'</div>'+
+ '<h2>'+t('What is the patient’s name?','ما اسم المريض؟')+'</h2>'+
+ '<p class="muted">'+t('First and last name only. The secure clinic directory stores the name separately from the study records.','الاسم الأول واسم العائلة فقط. يُحفظ الاسم بدليل خاص بالعيادة منفصل عن سجلات الدراسة.')+'</p>'+
+ '<div class="field-grid"><label>'+t('First name','الاسم الأول')+'<input name="firstName" maxlength="60" autocomplete="off" required placeholder="'+t('First name','الاسم الأول')+'"></label>'+
+ '<label>'+t('Last name','اسم العائلة')+'<input name="lastName" maxlength="60" autocomplete="off" required placeholder="'+t('Family name','اسم العائلة')+'"></label>'+
  '<label>'+t('Age','العمر')+'<input name="age" type="number" min="18" max="110" required></label>'+
  '<label>'+t('Sex','الجنس')+'<select name="sex"><option value="Male">'+t('Male','ذكر')+'</option><option value="Female">'+t('Female','أنثى')+'</option></select></label>'+
- '<label>'+t('Years since type 2 diabetes diagnosis','سنوات الإصابة بالسكري من النوع الثاني')+'<input name="diabetesYears" type="number" min="0" max="100" step="1" required></label></div>'+
- '<h3>'+t('Medical history · Comorbidities · Medication','التاريخ المرضي · الأمراض المصاحبة · الأدوية')+'</h3>'+
- medicalFields()+
- '<h3>'+t('Baseline · Visit 1 (saved automatically)','الزيارة الأساسية · الزيارة الأولى (تُحفظ تلقائيًا)')+'</h3>'+
- '<p class="muted">'+t('Complete the first visit details now. Saving the form creates the patient and Baseline together.','سجّل تفاصيل الزيارة الأولى الآن. حفظ النموذج يُنشئ المريض وزيارة Baseline معًا.')+'</p>'+
+ '<label>'+t('Years since type 2 diabetes diagnosis','سنوات الإصابة بالسكري من النوع الثاني')+
+ '<input name="diabetesYears" type="number" min="0" max="100" step="1" required></label></div></section>'+
+ '<section class="wizard-step" data-wizard-step="1" hidden>'+
+ '<div class="wizard-kicker">'+t('STEP 02 · HISTORY','الخطوة 02 · التاريخ المرضي')+'</div>'+
+ '<h2>'+t('Diabetes history and medication','تاريخ السكري والأدوية')+'</h2>'+
+ '<p class="muted">'+t('Select comorbidities and record baseline medications, doses and frequency.','اختر الأمراض المصاحبة وسجّل الأدوية الأساسية وجرعاتها وتكرارها.')+'</p>'+
+ medicalFields()+'</section>'+
+ '<section class="wizard-step" data-wizard-step="2" hidden>'+
+ '<div class="wizard-kicker">'+t('STEP 03 · BASELINE','الخطوة 03 · الزيارة الأساسية')+'</div>'+
+ '<h2>'+t('Complete the first visit','أكمل تفاصيل الزيارة الأولى')+'</h2>'+
+ '<p class="muted">'+t('Baseline is saved together with the new patient in one operation.','تُحفظ زيارة Baseline مع المريض الجديد في عملية واحدة.')+'</p>'+
  '<div class="field-grid"><label>'+t('Baseline visit date','تاريخ الزيارة الأساسية')+'<input type="date" name="date" required></label>'+
  '<label>HbA1c (%)<input type="number" min="3" max="20" step="0.1" name="hba1c" required></label>'+
  '<label>'+t('Fasting glucose (mg/dL)','السكر الصائم (ملغم/دل)')+'<input type="number" min="30" max="1000" step="1" name="fpg" required></label>'+
@@ -438,12 +458,45 @@ function openEnrollForm(){
  '<label>'+t('Weight (kg)','الوزن (كغم)')+'<input type="number" min="1" max="400" step="0.1" name="weight"></label>'+
  '<label>'+t('Glenpa strength','تركيز جلينبا')+'<select name="dose"><option value="10/5 mg">10/5 mg</option><option value="25/5 mg">25/5 mg</option></select></label>'+
  '<label class="span2">'+t('Adverse events','الأحداث الضارة')+'<textarea name="adverseEvent" maxlength="400" rows="2"></textarea></label>'+
- '<label class="span2">'+t('Baseline medication reconciliation / changes','مراجعة الأدوية أو التغييرات عند الزيارة الأساسية')+'<textarea name="medicationChanges" maxlength="400" rows="2"></textarea></label>'+
- '<label class="span2">'+t('New diagnoses / comorbidities','التشخيصات أو الأمراض المصاحبة الجديدة')+'<textarea name="diagnosis" maxlength="400" rows="2"></textarea></label>'+
- '<label class="span2">'+t('Baseline visit notes','ملاحظات الزيارة الأساسية')+'<textarea name="notes" maxlength="400" rows="2"></textarea></label></div>'+
- '<div class="actions"><button class="cta" type="submit">'+t('Save patient + Baseline visit','حفظ المريض وزيارة Baseline')+'</button>'+
- '<button class="secondary" type="button" data-nav="patients">'+t('Cancel','إلغاء')+'</button></div></form>';
- $('view').innerHTML=panel(t('New patient · Diabetes profile','مريض جديد · ملف السكري'),markup);
+ '<label class="span2">'+t('Baseline medication changes','تغييرات الأدوية في الزيارة الأساسية')+'<textarea name="medicationChanges" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('New diagnoses','التشخيصات الجديدة')+'<textarea name="diagnosis" maxlength="400" rows="2"></textarea></label>'+
+ '<label class="span2">'+t('Clinical notes','الملاحظات السريرية')+'<textarea name="notes" maxlength="400" rows="2"></textarea></label></div></section>'+
+ '<div class="wizard-actions"><button class="secondary" type="button" id="wizardBack" hidden>'+t('← Previous','← السابق')+'</button>'+
+ '<button class="cta" type="button" id="wizardNext">'+t('Continue →','متابعة ←')+'</button>'+
+ '<button class="cta" type="submit" id="wizardSave" hidden>'+t('Save patient + Baseline','حفظ المريض والزيارة الأساسية')+'</button>'+
+ '<button class="secondary" type="button" data-nav="patients">'+t('Cancel','إلغاء')+'</button></div>'+
+ '<p class="wizard-hint">'+t('Enter to continue. No patient data is saved until the final confirmation.','اضغط Enter للمتابعة. لا تُحفظ أي بيانات قبل التأكيد النهائي.')+'</p></form>';
+ $('view').innerHTML=panel(t('Patient registration','تسجيل مريض'),form);
+ const first=$('view').querySelector('[name="firstName"]');first?.focus();
+}
+function wizardStep(form){
+ return Number(form.dataset.wizardStep||0);
+}
+function setWizardStep(form,index){
+ const step=Math.max(0,Math.min(2,index));
+ form.dataset.wizardStep=String(step);
+ form.querySelectorAll('[data-wizard-step]').forEach(section=>{section.hidden=Number(section.dataset.wizardStep)!==step;});
+ const next=form.querySelector('#wizardNext'),back=form.querySelector('#wizardBack'),save=form.querySelector('#wizardSave');
+ if(next)next.hidden=step===2;
+ if(back)back.hidden=step===0;
+ if(save)save.hidden=step!==2;
+ const text=form.querySelector('#wizardProgressText'),fill=form.querySelector('#wizardProgressFill');
+ if(text)text.textContent=(step+1)+' / 3';
+ if(fill)fill.style.width=((step+1)/3*100)+'%';
+ form.querySelector('[data-wizard-step="'+step+'"] input:not([type="hidden"]), [data-wizard-step="'+step+'"] textarea')?.focus();
+}
+function nextWizardStep(form){
+ const currentStep=wizardStep(form);
+ const section=form.querySelector('[data-wizard-step="'+currentStep+'"]');
+ for(const input of section.querySelectorAll('input,textarea,select')){
+  if(!input.checkValidity()){input.reportValidity();return}
+ }
+ if(currentStep===0){
+  const first=String(new FormData(form).get('firstName')||'').trim(),last=String(new FormData(form).get('lastName')||'').trim();
+  const correct=/^[\p{L}][\p{L}\p{M}'-]{1,59}$/u;
+  if(!correct.test(first)||!correct.test(last)){status(t('Enter exactly two name parts, without additional spaces.','أدخل الاسم الأول واسم العائلة دون فراغات داخل كل جزء.'),'error');return}
+ }
+ if(currentStep<2)setWizardStep(form,currentStep+1);
 }
 function openMedicalProfileForm(patient){
  if(!eligiblePatientWrite(patient))return;
