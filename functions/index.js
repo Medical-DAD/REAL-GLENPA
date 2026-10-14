@@ -11,7 +11,7 @@ const db = admin.firestore();
 const BOOTSTRAP_KEY = defineSecret('GLENPA_BOOTSTRAP_KEY');
 const app = express();
 const ORIGIN = 'https://medical-dad.github.io';
-const ITERATIONS = 150000;
+const {ITERATIONS,validPassword,timingEqual,makePassword,checkPassword}=require('./passwords');
 const SESSION_MAX = 12 * 60 * 60 * 1000;
 const REMEMBER_MAX = 30 * 24 * 60 * 60 * 1000;
 const MAX_PATIENTS = 2500;
@@ -20,28 +20,8 @@ const fail = (status, message) => Object.assign(new Error(message), {status});
 const cleanName = s => String(s || '').trim().toLowerCase();
 const validName = s => /^[a-z0-9._-]{3,40}$/.test(s);
 const validClinic = s => /^clinic(0[1-9]|1[0-9]|2[0-6])$/.test(s);
-const validPassword = s => typeof s === 'string' && s.length >= 14 && s.length <= 128;
 const ownKeys = (x, fields) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every(k => fields.includes(k));
-const safeUser = (id, d) => ({
-  id, username:d.username, role:d.role, clinicCode:d.clinicCode || '',
-  active:d.active === true, displayName:d.displayName || d.username,
-  createdAt: d.createdAt || null
-});
-function timingEqual(a,b){
- const lhs=Buffer.from(String(a||''),'utf8'),rhs=Buffer.from(String(b||''),'utf8');
- return lhs.length === rhs.length && crypto.timingSafeEqual(lhs,rhs);
-}
-function passwordHash(secret,salt){
- return crypto.pbkdf2Sync(secret,Buffer.from(salt,'hex'),ITERATIONS,32,'sha256').toString('hex');
-}
-function makePassword(secret){
- const passwordSalt=crypto.randomBytes(16).toString('hex');
- return {passwordSalt,passwordHash:passwordHash(secret,passwordSalt),passwordIterations:ITERATIONS,passwordAlgorithm:'PBKDF2-SHA256'};
-}
-function checkPassword(secret,user){
- if(!/^[0-9a-f]{32}$/.test(user.passwordSalt||'')||!/^[0-9a-f]{64}$/.test(user.passwordHash||'')||user.passwordIterations!==ITERATIONS)return false;
- return timingEqual(passwordHash(secret,user.passwordSalt),user.passwordHash);
-}
+const safeUser = (id, d) => ({id, username:d.username, role:d.role, clinicCode:d.clinicCode||'', active:d.active===true, displayName:d.displayName||d.username, createdAt:d.createdAt||null});
 function dateField(input){return typeof input==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(input)&&!Number.isNaN(Date.parse(input+'T12:00:00Z'));}
 function toJson(value){
  if(value && typeof value.toDate==='function')return value.toDate().toISOString();
