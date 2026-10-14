@@ -22,7 +22,7 @@
 .gl-admin-x{position:absolute;top:16px;inset-inline-end:16px;border:1px solid var(--line)!important;background:var(--bg)!important;color:var(--text)!important;border-radius:50%!important;width:37px;height:37px;padding:0!important;font-size:22px;line-height:1}
 .gl-login-status{font-size:12px;min-height:19px;margin:9px 0;color:var(--sub);line-height:1.6}
 .gl-admin-email-step{padding:10px 12px;background:var(--pale);border:1px solid var(--line);border-radius:12px;color:var(--text);font-size:12px;line-height:1.65;margin-bottom:12px}
-.gl-brand-trigger{cursor:pointer;user-select:none}
+.gl-brand-trigger{cursor:pointer;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .gl-brand-trigger:focus-visible{outline:2px solid #33ad9e;outline-offset:5px}
 @keyframes glAdminUp{from{opacity:0;transform:translateY(15px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:540px){.gl-login-layout{margin:17px auto}.gl-login-card{padding:23px}.gl-admin-modal{padding:25px}}
