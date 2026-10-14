@@ -286,16 +286,34 @@ function eligiblePatientWrite(patient){
  return isClinic()&&patient.clinicCode===clinicKey();
 }
 async function enrollPatient(form){
- if(!isClinic()||current.settings.enrollmentEnabled!==true)throw Error('Enrollment not authorized');
+ if(!isClinic()||current.settings.enrollmentEnabled!==true)throw Error(t('Enrollment is disabled.','تسجيل المرضى متوقف حاليًا.'));
  const f=new FormData(form),id=String(f.get('patientCode')||'').trim().toUpperCase();
- if(!/^[A-Z0-9_-]{3,24}$/.test(id))throw Error('Study ID must be 3–24 uppercase letters, digits, underscores or hyphens.');
+ if(!/^[A-Z0-9_-]{3,24}$/.test(id))throw Error(t('Study ID must be 3–24 letters, digits, underscores or hyphens.','رمز الدراسة يجب أن يتكون من 3 إلى 24 حرفًا أو رقمًا أو شرطة.'));
  const age=Number(f.get('age')),diabetesYears=Number(f.get('diabetesYears'));
- if(!Number.isInteger(age)||age<18||age>110||!Number.isFinite(diabetesYears)||diabetesYears<0||diabetesYears>100)throw Error('Invalid clinical values');
+ if(!Number.isInteger(age)||age<18||age>110||!Number.isFinite(diabetesYears)||diabetesYears<0||diabetesYears>100)throw Error(t('Invalid demographic or diabetes values.','قيم العمر أو مدة السكري غير صحيحة.'));
+ const medical=readMedicalFields(form);
+ if(medical.history.length>1500||medical.otherDiagnoses.length>500||medical.medications.length>1600)throw Error(t('Clinical text exceeds permitted limits.','النص السريري أطول من الحد المسموح.'));
  const clinicCode=clinicKey(),patientId=clinicCode+'_'+id;
- const payload={clinicCode,patientCode:id,age,sex:String(f.get('sex')),diabetesYears,createdBy:current.user.uid,createdAt:serverTimestamp()};
+ if((await getDoc(doc(db,'patients',patientId))).exists())throw Error(t('Study ID already exists.','رمز هذا المريض مسجّل مسبقًا.'));
+ const payload={
+  clinicCode,patientCode:id,age,sex:String(f.get('sex')),diabetesYears,...medical,
+  createdBy:current.user.uid,createdAt:serverTimestamp()
+ };
  await setDoc(doc(db,'patients',patientId),payload);
- current.patient=null;await loadRecords();status(t('Coded patient record created.','تم إنشاء سجل المريض المرمّز.'));
+ current.patient=patientId;current.view='patients';
+ await loadRecords();
+ status(t('Patient profile saved. Record Baseline as the first study visit.','تم حفظ ملف المريض. سجّل الآن زيارة Baseline كأول زيارة.'));
 }
+async function updateMedicalProfile(form,patient){
+ if(!eligiblePatientWrite(patient))throw Error(t('Only the assigned clinic may edit medical history.','العيادة المسؤولة فقط يمكنها تعديل التاريخ المرضي.'));
+ const medical=readMedicalFields(form);
+ if(medical.history.length>1500||medical.otherDiagnoses.length>500||medical.medications.length>1600)throw Error(t('Clinical text exceeds permitted limits.','النص السريري أطول من الحد المسموح.'));
+ await updateDoc(doc(db,'patients',patient.id),{...medical,updatedBy:current.user.uid,updatedAt:serverTimestamp()});
+ current.patient=patient.id;current.view='patients';
+ await loadRecords();
+ status(t('Medical history and medicines saved. Previous visits remain unchanged.','تم حفظ التاريخ المرضي والأدوية دون تغيير الزيارات السابقة.'));
+}
+
 async function saveVisit(form,patient){
  if(!eligiblePatientWrite(patient))throw Error('Visit writing not authorized');
  const f=new FormData(form),phase=String(f.get('phase'));
