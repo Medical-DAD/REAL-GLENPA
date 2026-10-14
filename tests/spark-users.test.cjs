@@ -11,9 +11,9 @@ test('clinic account setup uses username and numeric six-or-more-digit PIN witho
  assert.ok(guide.includes('Spark'));
 });
 test('clinic account uses an internal Firebase email identity while preserving username login',()=>{
- assert.match(js,/const email=username\+'@'\+INTERNAL_CLINIC_DOMAIN/);
- assert.match(js,/createUserWithEmailAndPassword\(secondAuth,email,password\)/);
- assert.match(js,/batch\.set\(doc\(db,'loginHandles',username\),\{email,userUid:user\.uid\}\)/);
+ assert.match(js,/const email=u\+'@'\+INTERNAL_CLINIC_DOMAIN/);
+ assert.match(js,/createUserWithEmailAndPassword\(secondAuth,email,pin\)/);
+ assert.match(js,/batch\.set\(doc\(db,'loginHandles',u\),\{email,userUid:authUser\.uid\}\)/);
  assert.match(js,/signInWithEmailAndPassword\(auth,await emailForUsername\(u\),password\)/);
 });
 test('existing Firestore rules enforce role and clinic checks',()=>{
