@@ -164,7 +164,7 @@ function readMedicalFields(form){
 
 function patientName(p){
  const entry=current.patientNames.get(p.id);
- return entry?entry.firstName+' '+entry.lastName:p.patientCode;
+ return entry?entry.firstName+' '+entry.lastName:t('Patient name not recorded','اسم المريض غير مسجل');
 }
 const normalizeSearch=value=>String(value||'').normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g,'').toLocaleLowerCase().trim().replace(/\s+/g,' ');
 function patientsView(){
@@ -181,8 +181,8 @@ function patientsView(){
  const notice=isClinic()&&!enrollment?'<div class="notice">'+t('New enrollment is currently disabled.','تسجيل المرضى الجدد متوقف حاليًا.')+'</div>':'';
  return panel(t('Patient registry','سجل المرضى'),heading+notice+directoryNotice+search+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Patient','المريض')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Age / Sex','العمر / الجنس')+'</th><th>'+t('Diabetes years','سنوات السكري')+'</th><th>'+t('History','السجل')+'</th></tr></thead><tbody>'+
- myList.map(p=>'<tr class="patient-list-row" data-patient-search="'+esc(normalizeSearch(patientName(p)+' '+p.patientCode))+'">'+
- '<td><b>'+esc(patientName(p))+'</b>'+(isClinic()?'<small class="subtle-id">'+t('Study reference','رمز الدراسة')+': '+esc(p.patientCode)+'</small>':'')+'</td>'+
+ myList.map(p=>'<tr class="patient-list-row" data-patient-search="'+esc(normalizeSearch(patientName(p)))+'">'+
+ '<td><b>'+esc(patientName(p))+'</b></td>'+
  '<td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+' / '+esc(p.sex)+'</td><td>'+esc(p.diabetesYears)+'</td>'+
  '<td><button class="link" data-patient="'+esc(p.id)+'">'+t('View patient','عرض الملف')+'</button></td></tr>').join('')+
  '</tbody></table></div>'+'<p id="patientSearchEmpty" class="empty hidden">'+t('No matching patients.','لا يوجد مرضى مطابقون للبحث.')+'</p>'+
@@ -207,11 +207,9 @@ function patientView(p){
   medicationTable(medicationLines(p))+
   (canWrite?'<div class="actions"><button class="secondary" type="button" id="editMedicalProfile">'+t('Edit medical profile','تعديل التاريخ المرضي والأدوية')+'</button></div>':''));
  return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+t('← Back to patient registry','← الرجوع إلى سجل المرضى')+'</button></div>'+ 
- (fullName?'<div class="patient-name-hero"><h2>'+esc(fullName.firstName+' '+fullName.lastName)+'</h2><small>'+t('Internal study reference','الرمز الداخلي للدراسة')+': '+esc(p.patientCode)+'</small></div>':
- '<div class="patient-name-hero"><h2>'+t('Patient name not recorded','اسم المريض غير مسجل')+'</h2><small>'+esc(p.patientCode)+'</small></div>')+
+ '<div class="patient-name-hero"><h2>'+esc(patientName(p))+'</h2></div>'+
  (canWrite&&current.nameDirectoryReady?'<div class="actions"><button class="secondary" id="editPatientName">'+t(fullName?'Correct patient name':'Add patient name',fullName?'تصحيح اسم المريض':'إضافة اسم المريض')+'</button></div>':'')+
- '<div class="grid">'+metric(t('Coded study ID','رمز المريض'),esc(p.patientCode))+
- metric(t('Age','العمر'),esc(p.age))+
+ '<div class="grid">'+metric(t('Age','العمر'),esc(p.age))+
  metric(t('Recorded study visits','الزيارات المسجّلة'),'<span id="patientVisitCount">…</span>')+'</div>'+
  clinicalProfile+
  panel(t('Visit history · Baseline & follow-ups','سجل الزيارات · Baseline والمتابعات'),
@@ -570,7 +568,7 @@ function openVisitForm(patient,phase){
  '<label class="span2">'+t('Clinical notes','الملاحظات السريرية')+'<textarea name="notes" maxlength="400" rows="2"></textarea></label></div>'+
  '<div class="actions"><button class="cta" type="submit">'+t('Save '+visitLabel(phase),'حفظ '+visitLabel(phase))+'</button>'+
  '<button class="secondary" type="button" data-patient="'+esc(patient.id)+'">'+t('Cancel','إلغاء')+'</button></div></form>';
- $('view').innerHTML=panel(visitLabel(phase)+' · '+esc(patient.patientCode),context+fields);
+ $('view').innerHTML=panel(visitLabel(phase)+' · '+esc(patientName(patient)),context+fields);
 }
 
 async function createClinicAccount({username,clinicCode,password}){
