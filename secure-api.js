@@ -4,7 +4,7 @@
  */
 export const API_URL='https://us-central1-glenpa-real.cloudfunctions.net/studyApi';
 const SESSION_KEY='glenpa-secure-session-v1';
-let token=null,user=null,expiration=0,remember=false,initialized=false;
+let token=null,user=null,profileBrief=null,expiration=0,remember=false,initialized=false;
 let observer=null;
 function readStored(){
  for(const storage of [sessionStorage,localStorage]){
@@ -20,10 +20,11 @@ function removeSaved(){
 function persist(){
  removeSaved();
  if(!token)return;
- try{(remember?localStorage:sessionStorage).setItem(SESSION_KEY,JSON.stringify({token,expiresAt:expiration}))}catch(e){}
+ try{(remember?localStorage:sessionStorage).setItem(SESSION_KEY,JSON.stringify({token,expiresAt:expiration,uid:profileBrief?.uid||null,username:profileBrief?.username||'',role:profileBrief?.role||''}))}catch(e){}
 }
 function setIdentity(identity){
  user=identity?.uid?{uid:identity.uid}:null;
+ profileBrief=user?{uid:identity.uid,username:identity.profile?.username||'',role:identity.profile?.role||''}:null;
  if(observer)observer(user);
 }
 function clear(){token=null;expiration=0;remember=false;removeSaved();setIdentity(null)}
@@ -53,7 +54,7 @@ export async function initializeSession(callback){
 }
 export async function startSession(username,password,rememberMe=false){
  const data=await call('/session',{method:'POST',body:{username,password,remember:rememberMe},authRequired:false});
- token=data.token;expiration=data.expiresAt;remember=Boolean(rememberMe);persist();setIdentity(data);return data;
+ token=data.token;expiration=data.expiresAt;remember=Boolean(rememberMe);setIdentity(data);persist();return data;
 }
 export async function endSession(){
  if(token)try{await call('/session',{method:'DELETE'})}catch(e){}
