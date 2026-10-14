@@ -485,19 +485,24 @@ async function updateSettings(form){
  await loadRecords();status(t('Study settings saved.','تم حفظ إعدادات الدراسة.'));
 }
 async function exportCodedCSV(){
- const cols=['clinicCode','patientCode','age','sex','diabetesYears','visit','visitDate','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges'];
- const rows=[cols];const all=current.patients;
- for(const p of all){
+ const cols=['clinicCode','patientCode','age','sex','diabetesYears','medicalHistory','comorbidities','otherComorbidities','baselineMedications',
+   'visit','visitDate','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','newDiagnoses','clinicalNotes'];
+ const rows=[cols];
+ for(const p of current.patients){
   const visits=await getDocs(collection(db,'patients',p.id,'visits'));
-  if(visits.empty){rows.push([p.clinicCode,p.patientCode,p.age,p.sex,p.diabetesYears,'','','','','','','','','']);continue}
-  for(const v of visits.docs){
-   const d=v.data();
-   rows.push([p.clinicCode,p.patientCode,p.age,p.sex,p.diabetesYears,v.id,d.date,d.hba1c,d.fpg,d.egfr,d.weight,d.dose,d.adverseEvent,d.medicationChanges]);
+  const shared=[p.clinicCode,p.patientCode,p.age,p.sex,p.diabetesYears,p.history,
+   Array.isArray(p.diagnoses)?p.diagnoses.join('; '):'',p.otherDiagnoses,medicationLines(p).replace(/\r?\n/g,'; ')];
+  if(visits.empty){rows.push([...shared,...Array(cols.length-shared.length).fill('')]);continue}
+  for(const visit of visits.docs){
+   const d=visit.data();
+   rows.push([...shared,visit.id,d.date,d.hba1c,d.fpg,d.egfr,d.weight,d.dose,
+    d.adverseEvent,d.medicationChanges,d.diagnosis,d.notes]);
   }
  }
  const csv=rows.map(row=>row.map(escapeCsv).join(',')).join('\r\n');
  const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
- const a=document.createElement('a');a.href=url;a.download='GLENPA-REAL-Coded-Visits.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const link=document.createElement('a');link.href=url;link.download='GLENPA-REAL-Complete-Patient-History.csv';link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function downloadQR(){
  const canvas=$('qrCanvas');if(!canvas||typeof window.QRCode==='undefined')return status(t('QR generator is unavailable.','مولّد QR غير متاح.'),'error');
