@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Blob} from 'node:buffer';
 import {deflateRawSync,crc32} from 'node:zlib';
-import {DOMParser} from 'linkedom';
+import {DOMParser} from '@xmldom/xmldom';
 import {readClinicTemplate,clinicTemplateBlob} from '../excel-lite.js';
 import inflateRaw from '../vendor/tiny-inflate.js';
 globalThis.DOMParser=DOMParser;
