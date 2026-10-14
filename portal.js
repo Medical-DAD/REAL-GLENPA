@@ -339,6 +339,8 @@ async function handleClick(e){
  if(e.target.id==='exportCsvBtn')await safeAction(exportCodedCSV);
  if(e.target.id==='downloadQR')downloadQR();
 }
+// Navigation buttons live OUTSIDE #view. Without this listener every top tab is inert.
+$('nav').addEventListener('click',handleClick);
 $('view').addEventListener('click',handleClick);
 $('view').addEventListener('submit',e=>{
  e.preventDefault();const form=e.target;
