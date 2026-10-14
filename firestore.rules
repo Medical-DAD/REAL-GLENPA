@@ -99,6 +99,8 @@ service cloud.firestore {
     match /patients/{patientId} {
       allow get, list: if admin() || sameClinic(resource.data.clinicCode);
       allow create: if clinic()
+        && exists(/databases/$(database)/documents/siteSettings/main)
+        && get(/databases/$(database)/documents/siteSettings/main).data.enrollmentEnabled == true
         && request.resource.data.keys().hasOnly(['clinicCode','patientCode','age','sex','diabetesYears','createdBy','createdAt'])
         && request.resource.data.keys().hasAll(['clinicCode','patientCode','age','sex','diabetesYears','createdBy','createdAt'])
         && request.resource.data.clinicCode == myClinic()
