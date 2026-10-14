@@ -79,3 +79,25 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
 /* Keep Excel progress and per-row errors visible next to the upload controls. */
 #clinicWorkbookStatus{white-space:pre-line;overflow-wrap:anywhere;font-weight:650;min-height:1.3rem}
 #importClinicWorkbook:disabled{opacity:.6;cursor:not-allowed}
+
+/* Administrator-only clinic enrollment oversight */
+.clinic-overview-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0 20px}
+.clinic-overview-stats .metric{margin:0}
+.clinic-progress-wrap{display:flex;align-items:center;gap:10px;min-width:125px}
+.clinic-progress-track{height:10px;flex:1;background:var(--line);border-radius:999px;overflow:hidden;min-width:75px}
+.clinic-progress-track>span{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary2));border-radius:999px;transition:width .2s ease}
+.clinic-progress-percentage{font-weight:800;color:var(--primary);min-width:35px;text-align:end;font-size:12px}
+.clinic-doctor-link{font-weight:850!important;text-align:start;white-space:normal!important}
+.clinic-detail-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:22px 0 15px;background:var(--pale);border:1px solid var(--line);border-radius:20px;padding:22px 26px}
+.clinic-detail-hero h3{font-size:clamp(20px,3vw,29px);margin:4px 0}
+.clinic-detail-hero p{margin:5px 0}
+.clinic-detail-eyebrow{font-size:11px;font-weight:900;letter-spacing:.12em;color:var(--primary)}
+.clinic-detail-count{display:flex;flex-direction:column;text-align:center;min-width:125px}
+.clinic-detail-count strong{font-size:clamp(26px,4vw,40px);line-height:1.2;color:var(--primary);white-space:nowrap}
+.clinic-detail-count span{font-size:12px;color:var(--sub)}
+.clinic-detail-hero+.clinic-progress-wrap{max-width:420px;margin:8px 0 15px}
+@media(max-width:720px){
+ .clinic-overview-stats{grid-template-columns:1fr;gap:10px}
+ .clinic-detail-hero{padding:16px;align-items:flex-start}
+ .clinic-detail-count{min-width:95px}
+}
