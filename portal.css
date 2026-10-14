@@ -9,3 +9,4 @@
 .install-btn{border:0;background:linear-gradient(110deg,#35beac,#74dfbe);padding:11px 13px;color:#062d37;border-radius:11px;font-weight:850}
 .install-x{border:0;background:#ffffff23;color:#fff;border-radius:8px;padding:4px 9px;font-size:20px}
 @media(min-width:820px){.install-invite{display:none!important}}
+.remember-choice{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:700}.remember-choice input{width:18px;height:18px;min-height:18px;accent-color:var(--primary)}.remember-choice span{margin:0}

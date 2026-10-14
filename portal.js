@@ -1,12 +1,4 @@
-
-import{initializeApp,deleteApp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,deleteUser,setPersistence,browserSessionPersistence}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import{getFirestore,doc,getDoc,getDocs,collection,query,where,setDoc,updateDoc,writeBatch,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import{firebaseConfig}from'./firebase-config.js';
-
-const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
-const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
-
+import {db,doc,collection,query,where,getDoc,getDocs,setDoc,updateDoc,serverTimestamp,initializeSession,startSession,endSession,createClinicAccount,changeAccountPassword} from './secure-api.js';
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
 const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
@@ -18,7 +10,6 @@ const isClinic=()=>current.profile?.role==='clinic';
 const isAuthorized=()=>current.user&&current.profile?.active===true&&(isAdmin()||isClinic());
 const parseCode=s=>String(s||'').toLowerCase().trim();
 const validClinic=s=>/^clinic(0[1-9]|1[0-9]|2[0-6])$/.test(s);
-async function emailForUsername(u){if(u==='msl.admin')return ADMIN_EMAIL;const handle=await getDoc(doc(db,'loginHandles',u));if(!handle.exists())throw Error('Account has not been provisioned.');return handle.data().email;}
 function escapeCsv(x){let v=String(x??'');if(/^[\s]*[=+@-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}
 function status(message,kind){current.alert=message;const el=$('globalStatus');el.textContent=message;el.classList.toggle('hidden',!message);el.classList.toggle('critical',kind==='error')}
 function settingsTheme(){try{current.theme=localStorage.getItem('glenpa-theme')||'blue'}catch(e){}document.documentElement.dataset.theme=current.theme}
@@ -33,6 +24,8 @@ function updateLanguage(){
  $('loginTitle').textContent=t('Login','تسجيل الدخول');$('loginDesc').textContent=t('Access your assigned study workspace.','ادخل إلى مساحة العمل المخصصة لعيادتك.');
  $('usernameLabel').textContent=t('Username','اسم المستخدم');$('passwordLabel').textContent=t('Password','كلمة المرور');
  $('loginButton').textContent=t('Enter portal →','دخول بوابة الدراسة ←');
+ $('rememberText').textContent=t('Remember me on this device','تذكرني على هذا الجهاز');
+ $('adminRememberText').textContent=t('Remember me on this device','تذكرني على هذا الجهاز');
  $('adminTitle').textContent=t('Administrator Access','دخول مسؤول الدراسة');
  $('adminUsernameLabel').textContent=t('Username','اسم المستخدم');$('adminPasswordLabel').textContent=t('Password','كلمة المرور');
  $('adminLoginButton').textContent=t('Access dashboard →','الدخول إلى لوحة الإدارة ←');
@@ -40,21 +33,17 @@ function updateLanguage(){
 }
 function setBusy(id,bool){const el=$(id);if(el)el.disabled=bool}
 function errorMessage(err){
- const code=String(err?.code||'');
- if(code==='auth/invalid-credential'||code==='auth/wrong-password'||code==='auth/user-not-found')return t('The Firebase account or password is incorrect. Verify the administrator account linked to msl.admin.','حساب فايربيس أو كلمة مروره غير صحيحة. تأكد من حساب الأدمن المرتبط باسم msl.admin.');
- if(code==='auth/unauthorized-domain')return t('Add medical-dad.github.io to Firebase Authentication authorized domains.','يجب إضافة medical-dad.github.io إلى النطاقات المسموحة في Firebase Authentication.');
- if(code==='auth/operation-not-allowed')return t('Enable Email/Password in Firebase Authentication sign-in methods.','يجب تفعيل تسجيل الدخول بالبريد وكلمة المرور في Firebase Authentication.');
- if(code.includes('permission-denied'))return t('Firestore denied this operation. Confirm published rules and the active user profile.','رفضت Firestore العملية. تأكد من نشر القواعد وصلاحية حساب المستخدم.');
- if(code.includes('unavailable'))return t('Database temporarily unavailable. Retry.','قاعدة البيانات غير متاحة مؤقتًا. حاول مجددًا.');
- if(err?.message?.startsWith('No study access profile')||err?.message?.startsWith('Inactive or invalid study access profile'))return t('Firebase login succeeded, but this account has no active study access profile.','تم تسجيل الدخول إلى Firebase، لكن حسابك لا يملك صلاحية دراسة مفعلة.');
- return t('Could not complete operation.','تعذّر إكمال العملية.')+' '+String(err?.message||'').slice(0,140);
+ if(err?.code==='api/unavailable')return t('Study backend not deployed or unreachable.','خادم الدراسة غير منشور أو غير متاح.');
+ if(err?.code==='api/401')return t('Invalid login or expired session.','بيانات دخول خاطئة أو جلسة منتهية.');
+ if(err?.code==='api/429')return t('Too many login attempts. Try again in 15 minutes.','محاولات دخول كثيرة. حاول بعد 15 دقيقة.');
+ if(err?.code==='api/403')return t('Access not permitted for this account.','هذا الحساب لا يملك صلاحية العملية.');
+ return String(err?.message||t('Operation failed.','تعذرت العملية.')).slice(0,190);
 }
-async function login(username,password,admin){
+async function login(username,password,admin,remember=false){
  const u=parseCode(username);
  if(admin&&u!=='msl.admin')throw Error('Invalid administrator username');
  if(!admin&&(!/^[a-z0-9._-]{3,40}$/.test(u)||u==='msl.admin'))throw Error('Invalid clinic username');
- await setPersistence(auth,browserSessionPersistence);
- await signInWithEmailAndPassword(auth,await emailForUsername(u),password);
+ await startSession(u,password,remember);
 }
 function renderNav(){
  const links=isAdmin()?[
@@ -108,7 +97,7 @@ function patientsView(){
  if(isClinic()&&!enrollment)heading+='<div class="notice">'+t('Enrollment is currently disabled by study settings.','التسجيل متوقف حاليًا بحسب إعدادات الدراسة.')+'</div>';
  return panel(t('Patient registry','سجل المرضى'),heading+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Study ID','رمز الدراسة')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Age','العمر')+'</th><th>'+t('Sex','الجنس')+'</th><th>'+t('Created','تاريخ الإنشاء')+'</th><th>'+t('Details','التفاصيل')+'</th></tr></thead><tbody>'+
- myList.map(p=>'<tr><td><b>'+esc(p.patientCode)+'</b></td><td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+'</td><td>'+esc(p.sex)+'</td><td>'+esc(p.createdAt?.toDate?.()?.toLocaleDateString?.()||'—')+'</td><td><button class="link" data-patient="'+esc(p.id)+'">'+t('Open','فتح')+'</button></td></tr>').join('')+'</tbody></table></div>'+
+ myList.map(p=>'<tr><td><b>'+esc(p.patientCode)+'</b></td><td>'+esc(p.clinicCode)+'</td><td>'+esc(p.age)+'</td><td>'+esc(p.sex)+'</td><td>'+esc(p.createdAt?new Date(p.createdAt).toLocaleDateString():'—')+'</td><td><button class="link" data-patient="'+esc(p.id)+'">'+t('Open','فتح')+'</button></td></tr>').join('')+'</tbody></table></div>'+
  (myList.length?'':'<div class="empty">'+t('No records enrolled.','لا توجد سجلات مسجلة بعد.')+'</div>'));
 }
 function patientView(p){
@@ -124,15 +113,15 @@ function patientView(p){
 function usersView(){
  if(!isAdmin())return '';
  return panel(t('Account directory','دليل الحسابات'),
- '<p class="muted">'+t('Create clinic logins with username and password. Passwords are handled by Firebase Authentication; only non-secret roles are saved to Firestore.','أنشئ حسابات العيادات بأسماء مستخدمين وكلمات مرور. تُدار كلمات المرور في Firebase Authentication وتُحفظ الأدوار غير السرية فقط في Firestore.')+'</p>'+
+ '<p class="muted">'+t('Manage username-only clinic access; password hashes are verified on the study server, without emails.','أدر حسابات العيادات باسم المستخدم وكلمة المرور فقط. يتحقق الخادم من البصمة، بدون إيميلات.')+'</p>'+
  '<form id="createUserForm"><div class="field-grid"><label>'+t('Username','اسم المستخدم')+'<input name="username" placeholder="clinic01" pattern="[a-zA-Z0-9._-]{3,40}" required></label>'+
  '<label>'+t('Clinic','العيادة')+'<select name="clinicCode" required>'+current.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.id+' · '+(c.doctorName||''))+'</option>').join('')+'</select></label>'+
- '<label>'+t('Login email (not shown on clinic login)','البريد المرتبط بالحساب (لا يظهر بصفحة دخول العيادة)')+'<input type="email" name="email" autocomplete="email" required></label>'+'<label>'+t('New account password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+'<input type="password" name="password" required minlength="14" autocomplete="new-password"></label></div>'+
+ '<label>'+t('New account password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+'<input type="password" name="password" required minlength="14" autocomplete="new-password"></label></div>'+
  '<div class="actions"><button class="cta" type="submit">'+t('Create clinic account','إنشاء حساب العيادة')+'</button></div></form>'+
- '<p class="help">'+t('Use dedicated study passwords. Do not reuse historical demonstration credentials. Password resets for other users require an approved privileged backend or self-service workflow.','استخدم كلمات مرور جديدة ومخصصة للدراسة. لا تستخدم كلمات المرور التجريبية السابقة. إعادة تعيين كلمة مرور مستخدم آخر تتطلب خدمة خلفية مخوّلة أو آلية ذاتية.')+'</p>'+
+ '<p class="help">'+t('Use unique study passwords with at least 14 characters. A password change revokes earlier sessions.','استخدم كلمات مرور مخصصة للدراسة لا تقل عن 14 حرفًا. تغيير كلمة المرور يلغي الجلسات القديمة.')+'</p>'+
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Username','المستخدم')+'</th><th>'+t('Role','الصلاحية')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Status','الحالة')+'</th><th>'+t('Action','الإجراء')+'</th></tr></thead><tbody>'+
- current.users.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(!u.active||u.id!==current.user.uid?'<button class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div>');
+ current.users.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(!u.active||u.id!==current.user.uid?'<button class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button>':'')+' <button class="link" data-passuser="'+esc(u.id)+'">'+t('Change password','تغيير كلمة المرور')+'</button></td></tr>').join('')+'</tbody></table></div>');
 }
 function settingsView(){
  if(!isAdmin())return '';
@@ -278,24 +267,11 @@ function openVisitForm(patient){
 }
 async function provisionUser(form){
  if(!isAdmin())throw Error('Not authorized');
- const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||''),email=String(f.get('email')||'').trim().toLowerCase();
- if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||password.length<14||!email.includes('@'))throw Error('Invalid account data');
- const existing=await getDoc(doc(db,'loginHandles',username));
- if(existing.exists())throw Error('Username already exists');
- const second=initializeApp(firebaseConfig,'provision-'+Date.now()),secondAuth=getAuth(second);
- let user=null;
- try{
-  const signed=await createUserWithEmailAndPassword(secondAuth,email,password);
-  user=signed.user;
-  const batch=writeBatch(db);
-  batch.set(doc(db,'userProfiles',user.uid),{username,role:'clinic',clinicCode,active:true,createdBy:current.user.uid,createdAt:serverTimestamp()});
-  batch.set(doc(db,'loginHandles',username),{email,userUid:user.uid});
-  await batch.commit();await signOut(secondAuth);
- }catch(e){
-  if(user)try{await deleteUser(user)}catch(cleanup){}
-  throw e;
- }finally{await deleteApp(second)}
- await loadRecords();status(t('Clinic account created. Share credentials via an approved secure channel.','تم إنشاء حساب العيادة. شارك بيانات الدخول عبر قناة آمنة معتمدة.'));
+ const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||'');
+ if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||password.length<14)throw Error('Invalid account data');
+ await createClinicAccount({username,clinicCode,password});
+ form.reset();await loadRecords();
+ status(t('Clinic account created. Share credentials securely.','تم إنشاء حساب العيادة. شارك بيانات الدخول عبر قناة آمنة.'));
 }
 async function updateSettings(form){
  if(!isAdmin())throw Error('Not authorized');
@@ -332,6 +308,17 @@ async function handleClick(e){
  const editBtn=e.target.closest('[data-editclinic]');if(editBtn){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
   $('view').innerHTML=panel(t('Edit clinic','تعديل العيادة'),'<form id="clinicForm"><input type="hidden" name="code" value="'+esc(c.id)+'"><div class="field-grid"><label>'+t('Doctor','الطبيب')+'<input name="doctorName" value="'+esc(c.doctorName||'')+'" required></label><label>'+t('Specialty','الاختصاص')+'<input name="specialty" value="'+esc(c.specialty||'')+'" required></label><label>'+t('Area','المنطقة')+'<input name="area" value="'+esc(c.area||'')+'" required></label></div><button class="cta" type="submit">'+t('Save changes','حفظ التعديلات')+'</button></form>');return}
+ const passwordButton=e.target.closest('[data-passuser]');
+ if(passwordButton){
+  if(!isAdmin())return;
+  const account=current.users.find(x=>x.id===passwordButton.dataset.passuser);if(!account)return;
+  $('view').innerHTML=panel(t('Change password: ','تغيير كلمة مرور: ')+esc(account.username),
+   '<form id="changePasswordForm"><input type="hidden" name="uid" value="'+esc(account.id)+'"><label>'+t('New password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+
+   '<input type="password" autocomplete="new-password" name="password" required minlength="14" maxlength="128"></label>'+
+   '<button class="cta" type="submit">'+t('Save new password','حفظ كلمة المرور الجديدة')+'</button>'+
+   ' <button class="secondary" type="button" data-nav="users">'+t('Cancel','إلغاء')+'</button></form>');
+  return;
+ }
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
  if(e.target.id==='newPatientBtn')openEnrollForm();
  if(e.target.id==='newVisitBtn'){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p)}
@@ -348,6 +335,7 @@ $('view').addEventListener('submit',e=>{
   if(form.id==='enrollForm')await enrollPatient(form);
   else if(form.id==='visitForm'){const p=current.patients.find(x=>x.id===current.patient);if(p)await saveVisit(form,p)}
   else if(form.id==='createUserForm')await provisionUser(form);
+  else if(form.id==='changePasswordForm'){if(!isAdmin())throw Error('Not authorized');const f=new FormData(form);await changeAccountPassword(String(f.get('uid')),String(f.get('password')));current.view='users';await loadRecords();status(t('Password changed and old sessions revoked.','تم تغيير كلمة المرور وإلغاء الجلسات القديمة.'));}
   else if(form.id==='settingsForm')await updateSettings(form);
   else if(form.id==='clinicForm'){
    if(!isAdmin())throw Error('Unauthorized');
@@ -360,11 +348,11 @@ $('view').addEventListener('submit',e=>{
 });
 $('theme').onclick=themeNext;
 $('language').onclick=()=>{current.language=current.language==='en'?'ar':'en';updateLanguage()};
-$('signout').onclick=()=>safeAction(async()=>{await signOut(auth);current.profile=null;current.user=null;current.patient=null;current.patients=[];current.users=[];current.clinics=[];status('');render()});
+$('signout').onclick=()=>safeAction(async()=>{await endSession();current.profile=null;current.user=null;current.patient=null;current.patients=[];current.users=[];current.clinics=[];status('');render()});
 $('loginForm').onsubmit=e=>{
  e.preventDefault();
  safeAction(async()=>{setBusy('loginButton',true);try{
-  await login($('username').value,$('password').value,false);
+  await login($('username').value,$('password').value,false,$('rememberMe')?.checked===true);
   $('password').value='';$('authMessage').textContent='';
  }catch(err){$('authMessage').textContent=errorMessage(err)}finally{setBusy('loginButton',false)}});
 };
@@ -377,11 +365,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.classList.
 $('adminLoginForm').onsubmit=e=>{
  e.preventDefault();
  safeAction(async()=>{setBusy('adminLoginButton',true);try{
-  await login($('adminUsername').value,$('adminPassword').value,true);
+  await login($('adminUsername').value,$('adminPassword').value,true,$('adminRemember')?.checked===true);
   $('adminMessage').textContent='';closeAdmin();
  }catch(err){$('adminMessage').textContent=errorMessage(err)}finally{setBusy('adminLoginButton',false)}});
 };
-onAuthStateChanged(auth,async user=>{
+initializeSession(async user=>{
  current.user=user;current.profile=null;current.patient=null;current.patients=[];current.clinics=[];current.users=[];current.ready=false;
  if(!user){render();return}
  try{
@@ -390,7 +378,7 @@ onAuthStateChanged(auth,async user=>{
   const p=profile.data();
   if(p.active!==true||!['clinic','study_oversight'].includes(p.role)||p.role==='clinic'&&!validClinic(p.clinicCode)||p.role==='study_oversight'&&p.username!=='msl.admin')throw Error('Inactive or invalid study access profile.');
   current.profile=p;current.view='overview';render();await loadRecords();
- }catch(e){await signOut(auth);status(errorMessage(e),'error')}
+ }catch(e){await endSession();status(errorMessage(e),'error')}
 });
 settingsTheme();updateLanguage();render();
 
