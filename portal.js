@@ -6,6 +6,9 @@ import{firebaseConfig}from'./firebase-config.js';
 
 const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
 const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
+// Firebase Auth requires an internal email identifier, but clinic staff never enter or see it.
+// Using this app's Firebase Auth domain avoids needing real staff email addresses.
+const INTERNAL_CLINIC_DOMAIN='glenpa-real.firebaseapp.com';
 
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
@@ -124,12 +127,12 @@ function patientView(p){
 function usersView(){
  if(!isAdmin())return '';
  return panel(t('Account directory','دليل الحسابات'),
- '<p class="muted">'+t('Create clinic logins with username and password. Passwords are handled by Firebase Authentication; only non-secret roles are saved to Firestore.','أنشئ حسابات العيادات بأسماء مستخدمين وكلمات مرور. تُدار كلمات المرور في Firebase Authentication وتُحفظ الأدوار غير السرية فقط في Firestore.')+'</p>'+
+ '<p class="muted">'+t('Create clinic usernames and numeric passwords. No email address is required from doctors.','أنشئ حسابات العيادات بأسماء مستخدمين وكلمات مرور رقمية، بدون طلب إيميل من الأطباء.')+'</p>'+
  '<form id="createUserForm"><div class="field-grid"><label>'+t('Username','اسم المستخدم')+'<input name="username" placeholder="clinic01" pattern="[a-zA-Z0-9._-]{3,40}" required></label>'+
  '<label>'+t('Clinic','العيادة')+'<select name="clinicCode" required>'+current.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.id+' · '+(c.doctorName||''))+'</option>').join('')+'</select></label>'+
- '<label>'+t('Login email (not shown on clinic login)','البريد المرتبط بالحساب (لا يظهر بصفحة دخول العيادة)')+'<input type="email" name="email" autocomplete="email" required></label>'+'<label>'+t('New account password (14+ characters)','كلمة مرور جديدة (14 حرفًا على الأقل)')+'<input type="password" name="password" required minlength="14" autocomplete="new-password"></label></div>'+
+ '<label>'+t('Numeric password (6 digits minimum)','كلمة مرور رقمية (6 أرقام على الأقل)')+'<input type="password" name="password" inputmode="numeric" pattern="[0-9]{6,32}" required minlength="6" maxlength="32" autocomplete="new-password" title="6 to 32 digits"></label></div>'+
  '<div class="actions"><button class="cta" type="submit">'+t('Create clinic account','إنشاء حساب العيادة')+'</button></div></form>'+
- '<p class="help">'+t('Use dedicated study passwords. Do not reuse historical demonstration credentials. Password resets for other users require an approved privileged backend or self-service workflow.','استخدم كلمات مرور جديدة ومخصصة للدراسة. لا تستخدم كلمات المرور التجريبية السابقة. إعادة تعيين كلمة مرور مستخدم آخر تتطلب خدمة خلفية مخوّلة أو آلية ذاتية.')+'</p>'+
+ '<p class="help">'+t('Six digits are the minimum, not a strong medical-data password. Disable users instantly here. Password resets and permanent account deletion are performed using the private local administrator tool, without Blaze or additional hosting.','ستة أرقام هي الحد الأدنى وليست كلمة مرور قوية لبيانات طبية. يمكنك تعطيل الحسابات هنا فورًا. تغيير كلمات المرور والحذف النهائي يتمان عبر أداة إدارة خاصة على جهازك دون Blaze أو استضافة إضافية.')+'</p>'+
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Username','المستخدم')+'</th><th>'+t('Role','الصلاحية')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Status','الحالة')+'</th><th>'+t('Action','الإجراء')+'</th></tr></thead><tbody>'+
  current.users.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.clinicCode||'—')+'</td><td><span class="pill">'+(u.active?t('Active','نشط'):t('Disabled','معطّل'))+'</span></td><td>'+(!u.active||u.id!==current.user.uid?'<button class="link" data-toggleuser="'+esc(u.id)+'">'+(u.active?t('Disable','تعطيل'):t('Enable','تفعيل'))+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div>');
@@ -278,8 +281,10 @@ function openVisitForm(patient){
 }
 async function provisionUser(form){
  if(!isAdmin())throw Error('Not authorized');
- const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||''),email=String(f.get('email')||'').trim().toLowerCase();
- if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||password.length<14||!email.includes('@'))throw Error('Invalid account data');
+ const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||'');
+ const email=username+'@'+INTERNAL_CLINIC_DOMAIN;
+ if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||!/^[0-9]{6,32}$/.test(password))throw Error(t('Enter a valid clinic username and a numeric password of 6 to 32 digits.','أدخل اسم مستخدم صحيح وكلمة مرور رقمية من 6 إلى 32 رقمًا.'));
+ if(current.users.some(u=>parseCode(u.username)===username))throw Error(t('Username already exists.','اسم المستخدم موجود مسبقًا.'));
  const existing=await getDoc(doc(db,'loginHandles',username));
  if(existing.exists())throw Error('Username already exists');
  const second=initializeApp(firebaseConfig,'provision-'+Date.now()),secondAuth=getAuth(second);
@@ -295,7 +300,7 @@ async function provisionUser(form){
   if(user)try{await deleteUser(user)}catch(cleanup){}
   throw e;
  }finally{await deleteApp(second)}
- await loadRecords();status(t('Clinic account created. Share credentials via an approved secure channel.','تم إنشاء حساب العيادة. شارك بيانات الدخول عبر قناة آمنة معتمدة.'));
+ form.reset();await loadRecords();status(t('Clinic account created. Share the username and password privately.','تم إنشاء حساب العيادة. سلّم اسم المستخدم وكلمة المرور بشكل خاص وآمن.'));
 }
 async function updateSettings(form){
  if(!isAdmin())throw Error('Not authorized');
