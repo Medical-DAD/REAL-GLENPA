@@ -4,13 +4,24 @@
 
 ## إضافة مستخدم من الموقع
 
-1. افتح https://medical-dad.github.io/REAL-GLENPA/ وسجّل دخول الأدمن بالضغط 5 مرات على الشعار.
+1. افتح صفحة الأدمن المستقلة: https://medical-dad.github.io/REAL-GLENPA/admin.html ، وسجّل الدخول باسم `msl.admin` وكلمة مرور حسابه.
 2. افتح Users. ستظهر حسابات Firestore الموجودة حاليًا.
 3. أدخل Username مثل clinic01، واختر العيادة، وأدخل PIN رقميًا من 6 إلى 32 رقمًا.
 4. اضغط Create clinic account. المستخدم يدخل بالموقع باسم المستخدم والرقم السري فقط، وليس البريد.
-5. يمكن للأدمن تعطيل أو إعادة تفعيل أي حساب عيادة من نفس الجدول.
+5. يمكن للأدمن تعطيل أو إعادة تفعيل حسابات العيادات، أو الضغط على **Remove user** لإلغاء وصول المستخدم إلى الدراسة وإخفائه من القائمة النشطة.
 
 تقنيًا يحتاج Firebase Authentication بريدًا داخليًا للتمييز بين الحسابات. ينشئ الكود بريدًا داخليًا آليًا وفق الصيغة username@glenpa-real.firebaseapp.com، ويحتفظ بمطابقته ضمن loginHandles. لا يُطلب بريد من الطبيب ولا يظهر في واجهة تسجيل الدخول أو Users.
+
+## إزالة حساب من لوحة الأدمن
+
+من صفحة `admin.html → Users` اضغط **Remove user** بجانب العيادة، ثم وافق على التأكيد. هذا الإجراء:
+
+- يضع `active: false` و`removed: true` داخل `userProfiles`، فيوقف وصول المستخدم إلى سجلات الدراسة مباشرةً.
+- يخفي المستخدم من قائمة الحسابات النشطة، ويحفظ أثر الإزالة في قسم **Removed study accounts**.
+- **لا يحذف حساب Firebase Authentication نهائيًا**. لهذا تحتاج أمر `node manage.cjs delete USERNAME` من أداة الإدارة المحلية المبينة أدناه.
+- لا يغيّر السجلات الطبية أو الزيارات، ولا يمكن استخدامه لحذف حساب الأدمن.
+
+**مطلوب أول مرة:** يجب نسخ قواعد `firestore.rules` الأخيرة من https://github.com/Medical-DAD/REAL-GLENPA/blob/main/firestore.rules إلى Firebase Console → Firestore Database → Rules والضغط على Publish. بدون نشر القواعد الجديدة سيرفض Firestore إجراء Remove user.
 
 ## تغيير كلمة المرور أو حذف حساب نهائيًا — محليًا على جهازك فقط
 
@@ -61,6 +72,8 @@ node manage.cjs delete clinic01
 
 ## ملفات التنفيذ
 
-- portal.js: شاشة Users، إنشاء حسابات العيادات بأرقام PIN، وتفعيل أو تعطيل.
+- admin.html: صفحة الأدمن المستقلة، وتتضمن Users وClinics وسجلات الدراسة.
+- index.html: صفحة العيادات التي تعرض Study records وContact Us فقط.
+- portal.js: إنشاء حسابات العيادات بأرقام PIN وتعطيل أو إزالة الوصول إلى الدراسة.
 - admin-tools/manage.cjs: عرض الحسابات وتغيير PIN والحذف النهائي من جهاز الأدمن.
 - firestore.rules: قواعد Firestore تحصر بيانات الدراسة بكل عيادة، وتحمي سجلات المرضى.
