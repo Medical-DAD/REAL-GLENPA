@@ -13,7 +13,7 @@ const INTERNAL_CLINIC_DOMAIN='glenpa-real.firebaseapp.com';
 
 const WEB_URL='https://medical-dad.github.io/REAL-GLENPA/';
 const $=id=>document.getElementById(id);
-const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,visitDocs:new Map(),patientNames:new Map(),nameDirectoryReady:false,bulkRows:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
+const current={language:'en',theme:'blue',user:null,profile:null,view:'overview',clinics:[],patients:[],users:[],patient:null,selectedClinic:null,visitDocs:new Map(),patientNames:new Map(),nameDirectoryReady:false,bulkRows:null,settings:{studyTitle:'GLENPA REAL',enrollmentEnabled:false},busy:false,alert:'',ready:false};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,ar)=>current.language==='ar'?ar:en;
 const isAdmin=()=>current.profile?.role==='study_oversight';
@@ -97,12 +97,87 @@ function overview(){
  (isAdmin()?'<button class="secondary" data-nav="clinics">'+t('Clinic roster','قائمة العيادات')+'</button>':'')+'</div>')+
  panel(t('Data protection','حماية البيانات'),'<div class="security-note">'+t('Use coded study IDs only. Do not enter patient names, civil IDs, telephone numbers or other direct identifiers. Follow your approved protocol, ethics, privacy and pharmacovigilance procedures.','استخدم رموز مرضى الدراسة فقط. يمنع إدخال أسماء المرضى أو الأرقام الوطنية أو الهواتف أو أي معرف مباشر. يجب الالتزام بالبروتوكول المعتمد وإجراءات الأخلاقيات والخصوصية واليقظة الدوائية.')+'</div>');
 }
+const CLINIC_PATIENT_TARGET=20;
+function enrolledInClinic(clinicId){
+ return current.patients.filter(p=>p.clinicCode===clinicId);
+}
+function clinicPatientLabel(p){
+ // No personally identifying names are read by the administrator.
+ // Use a list position solely as a friendly label in the clinic's roster.
+ const records=enrolledInClinic(p.clinicCode);
+ const index=records.findIndex(row=>row.id===p.id);
+ return t('Patient ','المريض ')+String(index+1).padStart(2,'0');
+}
+function enrollmentProgress(count){
+ const percent=Math.min(100,Math.round((count/CLINIC_PATIENT_TARGET)*100));
+ return '<div class="clinic-progress-wrap"><div class="clinic-progress-track" role="progressbar" aria-label="'+
+ t('Enrolled of 20 patients','المرضى المسجلون من أصل 20')+'" aria-valuemin="0" aria-valuemax="20" aria-valuenow="'+Math.min(count,20)+'">'+
+ '<span style="width:'+percent+'%"></span></div><small class="clinic-progress-percentage">'+percent+'%</small></div>';
+}
+function clinicDetailView(clinic){
+ const records=enrolledInClinic(clinic.id);
+ const n=records.length;
+ const summary='<div class="actions"><button class="secondary" type="button" data-backclinics="1">'+
+ t('← Back to all clinics','← الرجوع إلى جميع العيادات')+'</button></div>'+
+ '<div class="clinic-detail-hero"><div><p class="clinic-detail-eyebrow">'+t('CLINIC PROGRESS','إنجاز العيادة')+'</p><h3>'+
+ esc(clinic.doctorName||clinic.name||clinic.id)+'</h3><p class="muted">'+esc(clinic.specialty||'')+
+ (clinic.area?' · '+esc(clinic.area):'')+'</p></div><div class="clinic-detail-count"><strong>'+n+' / '+CLINIC_PATIENT_TARGET+
+ '</strong><span>'+t('patients enrolled','مريض مسجل')+'</span></div></div>'+
+ enrollmentProgress(n)+
+ '<p class="help">'+(n>=CLINIC_PATIENT_TARGET?
+   t('Enrollment target reached.','تم الوصول للعدد المستهدف.'):
+   t('Remaining to target: ','المتبقي للوصول للمستهدف: ')+(CLINIC_PATIENT_TARGET-n))+'</p>'+
+ '<div class="security-note">'+t('Study oversight can review coded clinical records, medical history, medications and all visits. Patient names remain private to the assigned clinic.','يمكن للأدمن مراجعة السجلات السريرية المرمّزة والتاريخ المرضي والأدوية وجميع الزيارات. أسماء المرضى متاحة لعياداتهم فقط.')+'</div>';
+ const table='<div class="table-scroll"><table><thead><tr><th>'+t('Patient','المريض')+'</th>'+
+ '<th>'+t('Age / sex','العمر / الجنس')+'</th>'+
+ '<th>'+t('Diabetes duration','مدة السكري')+'</th>'+
+ '<th>'+t('Comorbidities','الأمراض المصاحبة')+'</th>'+
+ '<th>'+t('Medical file and visits','الملف الطبي والزيارات')+'</th></tr></thead><tbody>'+
+ records.map(p=>{
+  const diseases=(Array.isArray(p.diagnoses)?p.diagnoses:[]).slice(0,3).map(labelComorbidity);
+  if(p.otherDiagnoses)diseases.push(esc(p.otherDiagnoses));
+  return '<tr><td><b>'+clinicPatientLabel(p)+'</b></td><td>'+showValue(p.age)+' / '+showValue(p.sex)+'</td>'+
+   '<td>'+showValue(p.diabetesYears)+' '+t('years','سنوات')+'</td>'+
+   '<td>'+ (diseases.length?diseases.join('، '):t('Not recorded','غير مسجل'))+'</td>'+
+   '<td><button type="button" class="link" data-patient="'+esc(p.id)+'">'+
+   t('View clinical details','عرض التفاصيل الطبية')+'</button></td></tr>';
+ }).join('')+'</tbody></table></div>';
+ return panel(t('Clinic patient records','سجلات مرضى العيادة'),summary+
+  (records.length?table:'<div class="empty">'+t('No patients enrolled at this clinic yet.','لم تسجل هذه العيادة أي مريض بعد.')+'</div>'));
+}
 function clinicsView(){
- if(!isAdmin())return panel(t('Restricted','غير مخوّل'),t('Clinic management requires administrator permission.','إدارة العيادات تتطلب صلاحية المسؤول.'));
- return panel(t('Doctor and clinic roster','قائمة الأطباء والعيادات'),
- '<div class="table-scroll"><table><thead><tr><th>'+t('Code','الرمز')+'</th><th>'+t('Doctor','الطبيب')+'</th><th>'+t('Specialty','الاختصاص')+'</th><th>'+t('Area','المنطقة')+'</th><th>'+t('Edit','تعديل')+'</th></tr></thead><tbody>'+
- current.clinics.map(c=>'<tr><td>'+esc(c.id)+'</td><td><b>'+esc(c.doctorName||c.name||'')+'</b></td><td>'+esc(c.specialty||'')+'</td><td>'+esc(c.area||'')+'</td><td><button class="link" data-editclinic="'+esc(c.id)+'">'+t('Edit','تعديل')+'</button></td></tr>').join('')+
- '</tbody></table></div>');
+ if(!isAdmin())return panel(t('Restricted','غير مخوّل'),
+  t('Clinic management requires administrator permission.','إدارة العيادات تتطلب صلاحية المسؤول.'));
+ if(current.selectedClinic){
+  const found=current.clinics.find(c=>c.id===current.selectedClinic);
+  if(found)return clinicDetailView(found);
+  current.selectedClinic=null;
+ }
+ const total=current.clinics.reduce((sum,c)=>sum+enrolledInClinic(c.id).length,0);
+ const target=current.clinics.length*CLINIC_PATIENT_TARGET;
+ const complete=current.clinics.filter(c=>enrolledInClinic(c.id).length>=CLINIC_PATIENT_TARGET).length;
+ const summary='<div class="clinic-overview-stats">'+
+  metric(t('Total enrolled patients','إجمالي المرضى المسجلين'),total+' / '+target)+
+  metric(t('Clinics at target','العيادات التي حققت المستهدف'),complete+' / '+current.clinics.length)+
+  metric(t('Target per clinic','المستهدف لكل عيادة'),CLINIC_PATIENT_TARGET)+'</div>'+
+  '<p class="muted">'+t('Counts reflect actual patient records in Firestore. Select a clinic to review its enrolled patients and full clinical visit histories.','الأعداد مأخوذة من سجلات المرضى الفعلية في Firestore. اختر عيادة للاطلاع على مرضاها وتفاصيل الزيارات.')+'</p>';
+ return panel(t('Doctor and clinic roster','قائمة الأطباء والعيادات'),summary+
+ '<div class="table-scroll"><table><thead><tr><th>'+t('Code','الرمز')+'</th><th>'+t('Doctor','الطبيب')+'</th>'+
+ '<th>'+t('Specialty','الاختصاص')+'</th><th>'+t('Area','المنطقة')+'</th>'+
+ '<th>'+t('Enrolled / 20','المسجلون / 20')+'</th><th>'+t('Progress','الإنجاز')+'</th>'+
+ '<th>'+t('Details','التفاصيل')+'</th><th>'+t('Edit','تعديل')+'</th></tr></thead><tbody>'+
+ current.clinics.map(c=>{
+  const n=enrolledInClinic(c.id).length;
+  return '<tr><td>'+esc(c.id)+'</td>'+
+   '<td><button class="link clinic-doctor-link" type="button" data-viewclinic="'+esc(c.id)+'">'+
+    esc(c.doctorName||c.name||c.id)+'</button></td>'+
+   '<td>'+esc(c.specialty||'')+'</td><td>'+esc(c.area||'')+'</td>'+
+   '<td><strong class="tabular">'+n+' / '+CLINIC_PATIENT_TARGET+'</strong></td>'+
+   '<td>'+enrollmentProgress(n)+'</td>'+
+   '<td><button class="link" type="button" data-viewclinic="'+esc(c.id)+'">'+
+    t('View patients','عرض المرضى')+'</button></td>'+
+   '<td><button class="link" type="button" data-editclinic="'+esc(c.id)+'">'+t('Edit','تعديل')+'</button></td></tr>';
+ }).join('')+'</tbody></table></div>');
 }
 // Clinical profile fields mirror the original GLENPA REAL baseline form.
 // No patient names or other direct identifiers are collected.
@@ -206,8 +281,8 @@ function patientView(p){
   '</div><h3>'+t('Baseline concomitant medications','الأدوية المصاحبة الأساسية')+'</h3>'+
   medicationTable(medicationLines(p))+
   (canWrite?'<div class="actions"><button class="secondary" type="button" id="editMedicalProfile">'+t('Edit medical profile','تعديل التاريخ المرضي والأدوية')+'</button></div>':''));
- return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+t('← Back to patient registry','← الرجوع إلى سجل المرضى')+'</button></div>'+ 
- '<div class="patient-name-hero"><h2>'+esc(patientName(p))+'</h2></div>'+
+ return '<div class="actions"><button class="secondary" type="button" id="backPatients">'+(isAdmin()&&current.selectedClinic?t('← Back to clinic patients','← الرجوع إلى مرضى العيادة'):t('← Back to patient registry','← الرجوع إلى سجل المرضى'))+'</button></div>'+ 
+ '<div class="patient-name-hero"><h2>'+esc(isAdmin()?clinicPatientLabel(p):patientName(p))+'</h2></div>'+
  (canWrite&&current.nameDirectoryReady?'<div class="actions"><button class="secondary" id="editPatientName">'+t(fullName?'Correct patient name':'Add patient name',fullName?'تصحيح اسم المريض':'إضافة اسم المريض')+'</button></div>':'')+
  '<div class="grid">'+metric(t('Age','العمر'),esc(p.age))+
  metric(t('Recorded study visits','الزيارات المسجّلة'),'<span id="patientVisitCount">…</span>')+'</div>'+
@@ -739,7 +814,18 @@ async function safeAction(job){
  try{await job()}catch(e){status(errorMessage(e),'error')}finally{current.busy=false}
 }
 async function handleClick(e){
- const nav=e.target.closest('[data-nav]');if(nav){current.view=nav.dataset.nav;current.patient=null;current.visitDocs=new Map();render();return}
+ const nav=e.target.closest('[data-nav]');if(nav){current.view=nav.dataset.nav;current.patient=null;current.selectedClinic=null;current.visitDocs=new Map();render();return}
+ const clinicButton=e.target.closest('[data-viewclinic]');
+ if(clinicButton){
+  if(!isAdmin())return;
+  const clinicId=clinicButton.dataset.viewclinic;
+  if(!current.clinics.some(c=>c.id===clinicId))return;
+  current.selectedClinic=clinicId;current.patient=null;current.view='clinics';render();return;
+ }
+ if(e.target.closest('[data-backclinics]')){
+  if(!isAdmin())return;
+  current.selectedClinic=null;current.patient=null;current.view='clinics';render();return;
+ }
  const patientBtn=e.target.closest('[data-patient]');if(patientBtn){current.patient=patientBtn.dataset.patient;current.visitDocs=new Map();current.view='patients';render();return}
  const editBtn=e.target.closest('[data-editclinic]');if(editBtn){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
@@ -754,7 +840,7 @@ async function handleClick(e){
  if(e.target.id==='wizardBack'){const form=$('view').querySelector('#enrollForm');if(form)setWizardStep(form,wizardStep(form)-1);return}
  const nextVisit=e.target.closest('[data-addvisit]');
  if(nextVisit){const p=current.patients.find(x=>x.id===current.patient);if(p)openVisitForm(p,nextVisit.dataset.addvisit)}
- if(e.target.id==='backPatients'){current.patient=null;current.visitDocs=new Map();render()}
+ if(e.target.id==='backPatients'){current.patient=null;current.visitDocs=new Map();if(isAdmin()&&current.selectedClinic)current.view='clinics';render()}
  if(e.target.id==='exportCsvBtn')await safeAction(exportCodedCSV);
  if(e.target.id==='downloadQR')downloadQR();
 }
@@ -806,7 +892,7 @@ $('view').addEventListener('submit',e=>{
 });
 $('theme').onclick=themeNext;
 $('language').onclick=()=>{current.language=current.language==='en'?'ar':'en';updateLanguage()};
-$('signout').onclick=()=>safeAction(async()=>{await signOut(auth);current.profile=null;current.user=null;current.patient=null;current.patients=[];current.users=[];current.clinics=[];status('');render()});
+$('signout').onclick=()=>safeAction(async()=>{await signOut(auth);current.profile=null;current.user=null;current.patient=null;current.selectedClinic=null;current.patients=[];current.users=[];current.clinics=[];status('');render()});
 $('loginForm').onsubmit=e=>{
  e.preventDefault();
  safeAction(async()=>{setBusy('loginButton',true);try{
