@@ -43,3 +43,35 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
 .visit-notes b{font-size:12px;color:var(--primary)}
 .visit-notes p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0 8px}
 @media(max-width:600px){.visit-card{padding:13px}.visit-title-line{gap:9px}.visit-step{width:33px;height:33px}.visit-title-line strong{font-size:13px}.visit-status{font-size:10px;padding:4px 7px}.visit-content{padding:12px 0 0}[dir=rtl] .visit-content{padding:12px 0 0}.diagnosis-grid{grid-template-columns:1fr}}
+
+
+/* Clinic-only patient directory and guided three-step enrollment */
+.patient-search{display:block;max-width:560px;margin:18px 0;font-weight:700}
+.patient-search input{margin-top:9px;font-size:1.08rem;background:var(--surface,#fff);border-radius:14px;padding:14px 16px}
+.patient-list-row[hidden]{display:none!important}
+.subtle-id{display:block;color:var(--sub,#64748b);font-size:.76rem;margin-top:4px;font-weight:400}
+.patient-name-hero{background:linear-gradient(120deg,rgba(31,158,133,.1),rgba(51,120,151,.06));padding:20px 24px;margin:12px 0 18px;border:1px solid var(--line,#e0e6e5);border-radius:20px}
+.patient-name-hero h2{margin:0 0 5px;font-size:clamp(1.45rem,3vw,2rem)}
+.patient-name-hero small{color:var(--sub,#64748b)}
+.patient-wizard{width:100%}
+.wizard-progress{margin:4px 0 28px}
+.wizard-progress-head{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:.83rem;font-weight:750;margin-bottom:9px;color:var(--text,#173447)}
+.wizard-track{height:7px;border-radius:10px;background:rgba(20,100,105,.12);overflow:hidden}
+.wizard-track>span{display:block;height:100%;background:linear-gradient(90deg,#227879,#39b38e);border-radius:10px;transition:width .25s ease}
+.wizard-step{animation:wizard-enter .22s ease}
+.wizard-step[hidden],.wizard-actions button[hidden]{display:none!important}
+.wizard-step h2{font-size:clamp(1.45rem,3vw,2.1rem);letter-spacing:-.02em;margin:8px 0 10px}
+.wizard-step .field-grid{margin-top:22px}
+.wizard-step .field-grid>label{padding:0}
+.wizard-step input,.wizard-step select,.wizard-step textarea{background:var(--surface,#fff);font-size:1rem;padding:13px 15px;border-radius:13px;transition:border-color .18s ease,box-shadow .18s ease}
+.wizard-step input:focus,.wizard-step select:focus,.wizard-step textarea:focus{outline:2px solid rgba(39,163,145,.3);border-color:#2c9b94}
+.wizard-kicker{color:#288981;font-size:.78rem;font-weight:900;letter-spacing:.1em}
+.wizard-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:28px}
+.wizard-hint{font-size:.77rem;color:var(--sub,#64748b);margin-top:13px}
+.excel-import-card{margin:24px 0;padding:22px;border:1px solid var(--line,#dee6e4);border-radius:20px;background:rgba(36,148,138,.04)}
+.excel-import-card h3{margin:0 0 8px}
+.excel-import-card .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:15px 0}
+.file-button{position:relative;display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border:1px solid var(--line,#dce2df);border-radius:12px;cursor:pointer;font-weight:700;background:var(--surface,#fff);color:var(--text,#123)}
+.file-button input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+@keyframes wizard-enter{from{opacity:.5;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:660px){.wizard-actions>*{flex:1 1 auto}.patient-name-hero{padding:16px}.excel-import-card{padding:16px}.file-button{max-width:100%}}
