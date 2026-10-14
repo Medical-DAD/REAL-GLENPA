@@ -227,6 +227,13 @@ function usersView(){
  '<label>'+t('Numeric password (6 digits minimum)','كلمة مرور رقمية (6 أرقام على الأقل)')+'<input type="password" name="password" inputmode="numeric" pattern="[0-9]{6,32}" required minlength="6" maxlength="32" autocomplete="new-password" title="6 to 32 digits"></label></div>'+
  '<div class="actions"><button class="cta" type="submit">'+t('Create clinic account','إنشاء حساب العيادة')+'</button></div></form>'+
  '<p class="help">'+t('Six digits are the minimum, not a strong medical-data password. Disable users instantly here. Password resets and permanent account deletion are performed using the private local administrator tool, without Blaze or additional hosting.','ستة أرقام هي الحد الأدنى وليست كلمة مرور قوية لبيانات طبية. يمكنك تعطيل الحسابات هنا فورًا. تغيير كلمات المرور والحذف النهائي يتمان عبر أداة إدارة خاصة على جهازك دون Blaze أو استضافة إضافية.')+'</p>'+
+ '<div class="excel-import-card"><div class="row"><div><h3>'+t('Import clinic accounts from Excel','استيراد حسابات العيادات من Excel')+'</h3>'+
+ '<p class="muted">'+t('Download the template, fill doctor details, username and PIN, then upload the .xlsx file. Up to 26 clinics.','نزّل القالب واملأ اسم الطبيب والتخصص والمنطقة واسم المستخدم والرقم السري ثم ارفع ملف Excel. حتى 26 عيادة.')+'</p></div></div>'+
+ '<div class="actions"><button type="button" class="secondary" id="downloadClinicXlsx">'+t('Download Excel template','تنزيل قالب Excel')+'</button>'+
+ '<label class="file-button">'+t('Choose completed Excel file','اختيار ملف Excel المعبّأ')+'<input id="clinicWorkbookFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>'+
+ '<button type="button" class="cta" id="importClinicWorkbook" disabled>'+t('Import clinic accounts','استيراد حسابات العيادات')+'</button></div>'+
+ '<p id="clinicWorkbookStatus" class="muted" aria-live="polite"></p>'+
+ '<p class="help">'+t('Excel contains PINs in plain text: keep it private and delete it after import. Existing users are not reset by import.','ملف Excel يحتوي الأرقام السرية بنص واضح. احتفظ به بشكل خاص واحذفه بعد الاستيراد. الاستيراد لا يغيّر كلمات مرور الحسابات الموجودة.')+'</p></div>'+
  '<p class="help"><a href="https://github.com/Medical-DAD/REAL-GLENPA/blob/main/ADMIN_USERS_GUIDE_AR.md" target="_blank" rel="noopener noreferrer">'+t('Local password reset and permanent account deletion instructions','تعليمات تغيير كلمة المرور والحذف النهائي على جهاز الأدمن')+'</a></p>'+ 
  '<h3>'+t('Existing profiles','الحسابات المسجلة')+'</h3>'+
  '<div class="table-scroll"><table><thead><tr><th>'+t('Username','المستخدم')+'</th><th>'+t('Role','الصلاحية')+'</th><th>'+t('Clinic','العيادة')+'</th><th>'+t('Status','الحالة')+'</th><th>'+t('Action','الإجراء')+'</th></tr></thead><tbody>'+
@@ -559,28 +566,94 @@ function openVisitForm(patient,phase){
  $('view').innerHTML=panel(visitLabel(phase)+' · '+esc(patient.patientCode),context+fields);
 }
 
-async function provisionUser(form){
+async function createClinicAccount({username,clinicCode,password}){
  if(!isAdmin())throw Error('Not authorized');
- const f=new FormData(form),username=parseCode(f.get('username')),clinicCode=String(f.get('clinicCode')||''),password=String(f.get('password')||'');
- const email=username+'@'+INTERNAL_CLINIC_DOMAIN;
- if(!/^[a-z0-9._-]{3,40}$/.test(username)||username==='msl.admin'||!validClinic(clinicCode)||!current.clinics.some(c=>c.id===clinicCode)||!/^[0-9]{6,32}$/.test(password))throw Error(t('Enter a valid clinic username and a numeric password of 6 to 32 digits.','أدخل اسم مستخدم صحيح وكلمة مرور رقمية من 6 إلى 32 رقمًا.'));
- if(current.users.some(u=>parseCode(u.username)===username))throw Error(t('Username already exists.','اسم المستخدم موجود مسبقًا.'));
- const existing=await getDoc(doc(db,'loginHandles',username));
- if(existing.exists())throw Error('Username already exists');
- const second=initializeApp(firebaseConfig,'provision-'+Date.now()),secondAuth=getAuth(second);
- let user=null;
+ const u=parseCode(username),clinic=String(clinicCode||''),pin=String(password||'');
+ const email=u+'@'+INTERNAL_CLINIC_DOMAIN;
+ if(!/^[a-z0-9._-]{3,40}$/.test(u)||u==='msl.admin'||!validClinic(clinic)||
+ !current.clinics.some(c=>c.id===clinic)||!/^[0-9]{6,32}$/.test(pin))throw Error(t('Invalid clinic account. Use 6–32 digits for PIN.','بيانات الحساب غير صحيحة. استخدم 6 إلى 32 رقمًا للرمز السري.'));
+ if(current.users.some(user=>parseCode(user.username)===u))throw Error(t('Username already exists.','اسم المستخدم موجود مسبقًا.'));
+ const existing=await getDoc(doc(db,'loginHandles',u));
+ if(existing.exists())throw Error(t('Username already exists.','اسم المستخدم موجود مسبقًا.'));
+ const second=initializeApp(firebaseConfig,'provision-'+crypto.randomUUID()),secondAuth=getAuth(second);
+ let authUser=null;
  try{
-  const signed=await createUserWithEmailAndPassword(secondAuth,email,password);
-  user=signed.user;
+  const result=await createUserWithEmailAndPassword(secondAuth,email,pin);
+  authUser=result.user;
   const batch=writeBatch(db);
-  batch.set(doc(db,'userProfiles',user.uid),{username,role:'clinic',clinicCode,active:true,createdBy:current.user.uid,createdAt:serverTimestamp()});
-  batch.set(doc(db,'loginHandles',username),{email,userUid:user.uid});
-  await batch.commit();await signOut(secondAuth);
- }catch(e){
-  if(user)try{await deleteUser(user)}catch(cleanup){}
-  throw e;
+  batch.set(doc(db,'userProfiles',authUser.uid),{
+   username:u,role:'clinic',clinicCode:clinic,active:true,createdBy:current.user.uid,createdAt:serverTimestamp()
+  });
+  batch.set(doc(db,'loginHandles',u),{email,userUid:authUser.uid});
+  await batch.commit();
+  await signOut(secondAuth);
+  return authUser.uid;
+ }catch(error){
+  if(authUser)try{await deleteUser(authUser)}catch(cleanup){}
+  throw error;
  }finally{await deleteApp(second)}
- form.reset();await loadRecords();status(t('Clinic account created. Share the username and password privately.','تم إنشاء حساب العيادة. سلّم اسم المستخدم وكلمة المرور بشكل خاص وآمن.'));
+}
+async function provisionUser(form){
+ const values=new FormData(form);
+ await createClinicAccount({username:values.get('username'),clinicCode:values.get('clinicCode'),password:values.get('password')});
+ form.reset();await loadRecords();
+ status(t('Clinic account created. Share credentials privately.','تم إنشاء حساب العيادة. سلّم البيانات بشكل خاص.'));
+}
+const clinicWorkbookColumns=['clinicCode','doctorName','specialty','area','username','password'];
+function verifyClinicWorkbook(rows){
+ if(!rows.length||rows.length>26)throw Error(t('Enter 1–26 clinic rows.','يجب إدخال 1 إلى 26 عيادة.'));
+ const codes=new Set(),users=new Set();
+ for(let i=0;i<rows.length;i++){
+  const row=rows[i],clinic=String(row.clinicCode||'').trim().toLowerCase(),u=parseCode(row.username),pin=String(row.password||'');
+  const doctor=String(row.doctorName||'').trim(),specialty=String(row.specialty||'').trim(),area=String(row.area||'').trim();
+  if(!validClinic(clinic)||codes.has(clinic))throw Error(t('Duplicate or invalid clinic code in row ','رمز عيادة مكرر أو غير صحيح في السطر ')+(i+2));
+  if(!/^[a-z0-9._-]{3,40}$/.test(u)||u==='msl.admin'||users.has(u))throw Error(t('Invalid or duplicate username in row ','اسم مستخدم غير صحيح أو مكرر في السطر ')+(i+2));
+  if(!/^[0-9]{6,32}$/.test(pin))throw Error(t('Numeric PIN must have 6–32 digits, row ','الرقم السري يجب أن يتكوّن من 6 إلى 32 رقمًا، السطر ')+(i+2));
+  if(!doctor||doctor.length>100||!specialty||specialty.length>80||!area||area.length>80)throw Error(t('Complete doctor, specialty, and area in row ','أكمل اسم الطبيب والتخصص والمنطقة في السطر ')+(i+2));
+  codes.add(clinic);users.add(u);
+ }
+}
+async function prepareClinicWorkbook(file){
+ if(!isAdmin())throw Error('Not authorized');
+ current.bulkRows=null;
+ const rows=await readClinicTemplate(file);
+ verifyClinicWorkbook(rows);
+ current.bulkRows=rows;
+ const box=$('clinicWorkbookStatus'),button=$('importClinicWorkbook');
+ if(box)box.textContent=t('Ready to create ','جاهز لإنشاء ')+rows.length+t(' clinic account(s). Review the file and click Import. Existing usernames will be skipped.',' حساب عيادة. راجع الملف ثم اضغط استيراد. سيتم تخطي أسماء المستخدمين الموجودة.');
+ if(button)button.disabled=false;
+}
+async function importClinicWorkbook(){
+ if(!isAdmin()||!current.bulkRows?.length)throw Error('No Excel file selected');
+ const rows=current.bulkRows;current.bulkRows=null;
+ let created=0,skipped=0;
+ const issues=[],progress=$('clinicWorkbookStatus');
+ const log=(text)=>{if(progress)progress.textContent=text};
+ try{
+  for(const [index,row]of rows.entries()){
+   const clinicCode=String(row.clinicCode).trim().toLowerCase(),username=parseCode(row.username);
+   log(t('Processing row ','معالجة السطر ')+(index+1)+' / '+rows.length+' · '+clinicCode);
+   if(current.users.some(u=>parseCode(u.username)===username)){skipped++;continue}
+   try{
+    const details={doctorName:String(row.doctorName).trim(),specialty:String(row.specialty).trim(),area:String(row.area).trim()};
+    const clinicDoc=doc(db,'clinics',clinicCode);
+    const found=await getDoc(clinicDoc);
+    if(found.exists())await updateDoc(clinicDoc,details);
+    else await setDoc(clinicDoc,details);
+    if(!current.clinics.some(c=>c.id===clinicCode))current.clinics.push({id:clinicCode,...details});
+    await createClinicAccount({username,clinicCode,password:String(row.password)});
+    current.users.push({username,id:'created-'+index,role:'clinic',clinicCode,active:true});
+    created++;
+   }catch(err){
+    issues.push(clinicCode+' ('+username+'): '+String(err.message||'Failed').slice(0,130));
+   }
+  }
+ }finally{
+  for(const row of rows)row.password=''; // Clear PINs from in-memory array immediately.
+ }
+ await loadRecords();
+ const summary=t('Created: ','تم الإنشاء: ')+created+t(' · Skipped: ',' · تم التخطي: ')+skipped+t(' · Failed: ',' · تعذّر: ')+issues.length;
+ status(summary+(issues.length?' · '+issues.join(' | '):''),issues.length?'error':'success');
 }
 async function updateSettings(form){
  if(!isAdmin())throw Error('Not authorized');
@@ -623,6 +696,8 @@ async function handleClick(e){
   if(!isAdmin())return;const c=current.clinics.find(x=>x.id===editBtn.dataset.editclinic);if(!c)return;
   $('view').innerHTML=panel(t('Edit clinic','تعديل العيادة'),'<form id="clinicForm"><input type="hidden" name="code" value="'+esc(c.id)+'"><div class="field-grid"><label>'+t('Doctor','الطبيب')+'<input name="doctorName" value="'+esc(c.doctorName||'')+'" required></label><label>'+t('Specialty','الاختصاص')+'<input name="specialty" value="'+esc(c.specialty||'')+'" required></label><label>'+t('Area','المنطقة')+'<input name="area" value="'+esc(c.area||'')+'" required></label></div><button class="cta" type="submit">'+t('Save changes','حفظ التعديلات')+'</button></form>');return}
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
+ if(e.target.id==='downloadClinicXlsx'){if(isAdmin())downloadClinicTemplate();return}
+ if(e.target.id==='importClinicWorkbook'){await safeAction(importClinicWorkbook);return}
  if(e.target.id==='newPatientBtn')openEnrollForm();
  if(e.target.id==='editMedicalProfile'){const p=current.patients.find(x=>x.id===current.patient);if(p)openMedicalProfileForm(p)}
  if(e.target.id==='editPatientName'){const p=current.patients.find(x=>x.id===current.patient);if(p)openPatientNameForm(p)}
@@ -637,6 +712,12 @@ async function handleClick(e){
 // Navigation buttons live OUTSIDE #view. Without this listener every top tab is inert.
 $('nav').addEventListener('click',handleClick);
 $('view').addEventListener('click',handleClick);
+$('view').addEventListener('change',e=>{
+ if(e.target.id!=='clinicWorkbookFile'||!isAdmin())return;
+ const file=e.target.files?.[0];if(!file)return;
+ e.target.value='';
+ safeAction(async()=>await prepareClinicWorkbook(file));
+});
 $('view').addEventListener('input',e=>{
  if(e.target.id!=='patientSearch')return;
  const term=normalizeSearch(e.target.value);
