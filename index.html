@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap">
 <link rel="stylesheet" href="./portal.css?v=20261014-prod4">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script type="module" src="./portal.js?v=20261014-prod6"></script>
+<script type="module" src="./portal.js?v=secure-auth1"></script>
 </head><body>
 <header class="topbar"><button id="brand" class="brand" type="button" aria-label="GLENPA REAL"><img src="./apple-touch-icon.png" alt="" width="42" height="42"><span><strong>GLENPA <em>REAL</em></strong><small>MEDICAL AFFAIRS · STUDY PORTAL</small></span></button>
 <div class="toptools"><button id="theme" class="quiet" type="button" title="Change theme">◑</button><button id="language" class="quiet" type="button">العربية</button><button id="signout" class="quiet hidden" type="button">Sign out</button></div></header>
@@ -28,6 +28,7 @@
 <form id="loginForm" class="panel auth-form"><div class="eyebrow teal">SECURE ACCESS</div><h2 id="loginTitle">Login</h2><p id="loginDesc" class="muted">Access your assigned study workspace.</p>
 <label><span id="usernameLabel">Username</span><input id="username" autocomplete="username" required placeholder="clinic01" maxlength="40"></label>
 <label><span id="passwordLabel">Password</span><input id="password" type="password" autocomplete="current-password" required></label>
+<label class="remember-choice"><input id="rememberMe" type="checkbox"><span id="rememberText">Remember me on this device</span></label>
 <button id="loginButton" class="cta" type="submit">Enter portal →</button><p class="form-status" id="authMessage" aria-live="polite"></p></form>
 </section>
 <section id="appScreen" class="hidden">
@@ -41,6 +42,7 @@
 <button type="button" id="closeAdmin" class="modal-close" aria-label="Close">×</button><span class="secret-icon">✦</span><p class="eyebrow teal">PRIVATE ADMINISTRATOR ACCESS</p><h2 id="adminTitle">Administrator Access</h2>
 <form id="adminLoginForm"><label><span id="adminUsernameLabel">Username</span><input value="msl.admin" readonly id="adminUsername" autocomplete="username"></label>
 <label><span id="adminPasswordLabel">Password</span><input id="adminPassword" type="password" required autocomplete="current-password"></label>
+<label class="remember-choice"><input id="adminRemember" type="checkbox"><span id="adminRememberText">Remember me on this device</span></label>
 <button id="adminLoginButton" class="cta" type="submit">Access dashboard →</button><p id="adminMessage" class="form-status" role="status"></p></form>
 </div></div>
 </body></html>
