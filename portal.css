@@ -140,3 +140,45 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
 .removed-users summary{cursor:pointer;font-weight:850;color:var(--text)}
 .removed-users .help{margin-top:12px}
 .removed-user-list{display:flex;gap:9px;flex-wrap:wrap;margin-top:11px}
+
+/* Clinical longitudinal measures: fully local SVG, no chart CDN or patient identifiers */
+.trend-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
+.trend-chart-card{padding:19px 19px 10px;background:var(--card);border:1px solid var(--line);border-radius:18px;min-width:0}
+.trend-chart-title{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:5px}
+.trend-chart-title h3{font-size:15px;margin:0;font-weight:850}
+.trend-chart-title span{font-size:11px;color:var(--sub);font-weight:650}
+.patient-trend-svg{width:100%;height:auto;min-height:152px;max-height:230px;display:block;overflow:visible;color:var(--text)}
+.trend-chart-note{font-size:11px;margin:0 0 5px;color:var(--sub)}
+.trend-no-data{min-height:143px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--sub);font-size:12px}
+.dq-summary{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;margin:4px 0 13px}
+.dq-summary>strong{font-size:15px}
+.dq-counter{font-weight:800;font-size:12px;padding:8px 13px;border-radius:100px;background:var(--pale);color:var(--text)}
+.dq-issues{padding:0;list-style:none;display:grid;gap:8px}
+.dq-issues li{display:flex;gap:11px;align-items:flex-start;padding:10px 13px;border:1px solid var(--line);background:var(--card);border-radius:11px;font-size:13px;line-height:1.6}
+.dq-issues li>span:first-child{font-size:14px;font-weight:900;min-width:17px}
+.dq-error{border-inline-start:4px solid #c75450!important}
+.dq-error>span:first-child{color:#c75450}
+.dq-warning{border-inline-start:4px solid #c59733!important}
+.dq-warning>span:first-child{color:#bc8b25}
+.dq-notice{border-inline-start:4px solid var(--primary)!important}
+.dq-notice>span:first-child{color:var(--primary)}
+.dq-clean{font-size:14px;color:var(--primary);font-weight:800}
+.dq-footnote{font-size:11px;color:var(--sub);margin:8px 0}
+.reports-hero{display:flex;justify-content:space-between;align-items:center;gap:28px;background:linear-gradient(115deg,#0f454c,#19746c 70%,#238f81);color:#f9fffd;border-radius:23px;padding:29px 33px;margin:4px 0 20px;box-shadow:0 18px 43px #123b461f}
+.reports-hero h2{font-size:clamp(23px,2.7vw,34px);margin:8px 0;color:#fff}
+.reports-hero p{max-width:560px;font-size:13px;color:#d2f2e8;margin-bottom:0}
+.report-eyebrow{font-size:10px;letter-spacing:.15em;color:#b4ebda;font-weight:850}
+.report-enrollment-pill{display:flex;flex-direction:column;align-items:center;min-width:175px;border:1px solid #ffffff55;border-radius:17px;background:#ffffff17;padding:18px}
+.report-enrollment-pill strong{font-size:clamp(23px,3.4vw,33px);white-space:nowrap;line-height:1.2;color:#fff}
+.report-enrollment-pill span{font-size:10px;color:#d2f2e8;text-align:center;margin-top:4px}
+.report-action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.report-action-grid>article{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow);min-width:0}
+.report-action-grid h3{font-size:17px;margin:8px 0 5px}
+.report-action-grid p{font-size:13px;min-height:84px;color:var(--sub);margin:8px 0 20px}
+.report-action-grid button{margin:0 4px 10px 0;max-width:100%}
+.report-action-icon{width:46px;height:46px;border-radius:15px;background:var(--pale);color:var(--primary);display:grid;place-items:center;font-size:22px;font-weight:850}
+.report-run-status{color:var(--sub);font-size:12px;margin:20px 0 16px;font-weight:700;white-space:pre-wrap}
+.quality-dashboard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin:10px 0 18px}
+.quality-dashboard .grid{margin:12px 0 20px}
+@media(max-width:900px){.report-action-grid{grid-template-columns:1fr}.report-action-grid p{min-height:0}}
+@media(max-width:720px){.trend-chart-grid{grid-template-columns:1fr}.reports-hero{flex-direction:column;align-items:stretch;padding:23px}.report-enrollment-pill{min-width:0}}
