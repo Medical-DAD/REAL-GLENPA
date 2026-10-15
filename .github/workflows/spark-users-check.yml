@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - 'portal.js'
+      - 'study-analytics.js'
+      - 'tests/study-analytics.test.mjs'
       - 'excel-lite.js'
       - 'portal.css'
       - 'tests/patient-directory-excel.test.mjs'
@@ -15,7 +17,7 @@ on:
       - 'vendor/**'
       - 'index.html'
       - 'admin.html'
-      - 'tests/admin-pages.test.cjs'
+      - 'tests/admin-pages.test.cjs tests/study-analytics.test.mjs'
       - 'admin-tools/**'
       - 'tests/spark-users.test.cjs'
       - '.github/workflows/spark-users-check.yml'
@@ -31,6 +33,7 @@ jobs:
       - name: Validate syntax
         run: |
           node --check portal.js
+          node --check study-analytics.js
           node --check excel-lite.js
           node --check admin-tools/manage.cjs
       - name: Set up XML parser for Excel compatibility tests (CI only)
