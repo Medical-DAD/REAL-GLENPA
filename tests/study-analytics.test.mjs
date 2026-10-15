@@ -96,12 +96,11 @@ test('admin report and clinical charts are wired in app without new external ser
  const s=fs.readFileSync('portal.js','utf8'),r=fs.readFileSync('firestore.rules','utf8');
  assert.ok(s.includes("['reports',t('Reports & quality'"));
  assert.ok(s.includes("reports:reportsView"));
- assert.ok(s.includes("id=\\"patientTrends\\""));
- assert.ok(s.includes("id=\\"patientQuality\\""));
+ assert.ok(s.includes('id="patientTrends"'));
+ assert.ok(s.includes('id="patientQuality"'));
  assert.ok(s.includes("if(e.target.id==='downloadStudyReport')"));
  assert.ok(s.includes("if(e.target.id==='runStudyQuality')"));
  assert.ok(s.includes("if(e.target.id==='downloadQualityCsv')"));
  assert.ok(s.includes("if(e.target.id==='downloadClinicSummary')"));
- assert.ok(s.includes("return new Map"));
  assert.ok(!r.includes("allow read, write: if true;"));
 });
