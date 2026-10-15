@@ -59,6 +59,7 @@ test('rendered patient chart displays conditions, baseline medicines and visit h
   console,document:{getElementById:lookup},window:{},
   getDocs:async()=>({docs:visitDocs,empty:visitDocs.length===0}),
   collection:()=>({}),db:{},serverTimestamp:()=>({}),
+  patientTrendMarkup:()=>'<svg class="patient-trend-svg"></svg>',patientQualityMarkup:()=>'<div>quality checked</div>',
   FormData,Date,URL
  };
  vm.createContext(context);
