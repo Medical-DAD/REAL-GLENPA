@@ -331,7 +331,7 @@ function reportsView(){
  '<p>'+t('Download enrollment progress out of 20 and visit counts per clinic as a spreadsheet-ready CSV.','تنزيل أعداد التسجيل من 20 وأعداد الزيارات لكل عيادة بملف CSV قابل للفتح في Excel.')+'</p>'+
  '<button id="downloadClinicSummary" class="secondary" type="button">'+t('Download clinic summary','تنزيل ملخص العيادات')+'</button></article></div>'+
  '<p id="reportRunStatus" class="report-run-status" aria-live="polite">'+
- t('No report generated yet. The latest saved visit records will be loaded when you click a report button.','لم يُنشأ تقرير بعد. تُحمّل أحدث سجلات الزيارات المحفوظة عند طلب التقرير.')+'</p>'+
+ t('No report generated yet. Your downloadable study report is an offline HTML document that can be printed or saved as PDF.','لم يُنشأ تقرير بعد. تقرير الدراسة ملف HTML مستقل يمكن طباعته أو حفظه PDF.')+'</p>'+
  '<div id="studyQualityResults"></div>'+
  '<div class="security-note">'+t('These outputs are descriptive, not validated statistical analyses or a substitute for clinical and pharmacovigilance review.','هذه تقارير وصفية وليست تحليلات إحصائية معتمدة أو بديلًا عن المراجعة السريرية واليقظة الدوائية.')+'</div>';
 }
@@ -363,7 +363,7 @@ async function gatherStudyReport(){
  const patients=current.patients.slice();
  const visits=new Map(),total=patients.length;let completed=0,next=0;
  const progress=$('reportRunStatus');
- const notice=()=>{if(progress)progress.textContent=t('Reading study visits ','جارٍ قراءة الزيارات ')+completed+' / '+total;};
+ const notice=()=>{const message=t('Reading study visits ','جارٍ قراءة الزيارات ')+completed+' / '+total; if(progress)progress.textContent=message;if($('loaderMessage'))$('loaderMessage').textContent=message;};
  notice();
  const workers=Array.from({length:Math.min(8,total)},async()=>{
   while(next<total){
@@ -384,8 +384,7 @@ async function runStudyReport(kind){
  if(!isAdmin())return;
  const statusEl=$('reportRunStatus');
  if(statusEl)statusEl.textContent=t('Preparing the latest coded study data…','جارٍ تجهيز أحدث بيانات الدراسة المرمّزة…');
- const stats=kind==='clinics'?
-  aggregateStudy(current.patients,new Map(),current.clinics):await gatherStudyReport();
+ const stats=await gatherStudyReport();
  const stamp=new Date().toISOString().slice(0,10);
  if(kind==='html'){
   downloadTextFile(reportHtml(stats,{ar:current.language==='ar'}),'GLENPA-REAL-Study-Report-'+stamp+'.html','text/html;charset=utf-8');
@@ -514,7 +513,8 @@ function getVisitValues(form,phase){
  const hba1c=Number(f.get('hba1c')),fpg=Number(f.get('fpg'));
  const egfr=f.get('egfr')===''?null:Number(f.get('egfr'));
  const weight=f.get('weight')===''?null:Number(f.get('weight'));
- if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date+'T12:00:00Z')))throw Error(t('Enter a valid visit date.','أدخل تاريخ زيارة صحيحًا.'));
+ const today=new Date(),localToday=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+ if(!validDate(date)||date>localToday)throw Error(t('Enter a valid visit date, not in the future.','أدخل تاريخ زيارة صحيحًا ولا يقع في المستقبل.'));
  if(!Number.isFinite(hba1c)||hba1c<3||hba1c>20||!Number.isFinite(fpg)||fpg<30||fpg>1000||
  (egfr!==null&&(!Number.isFinite(egfr)||egfr<0||egfr>200))||
  (weight!==null&&(!Number.isFinite(weight)||weight<1||weight>400)))throw Error(t('Check clinical measurements and units.','تحقق من القياسات السريرية ووحداتها.'));
@@ -538,6 +538,7 @@ async function enrollPatient(form){
  const id='P-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
  const age=Number(f.get('age')),diabetesYears=Number(f.get('diabetesYears'));
  if(!Number.isInteger(age)||age<18||age>110||!Number.isFinite(diabetesYears)||diabetesYears<0||diabetesYears>100)throw Error(t('Invalid demographic or diabetes values.','قيم العمر أو مدة السكري غير صحيحة.'));
+ if(diabetesYears>age)throw Error(t('Years with diabetes cannot exceed the patient age.','لا يمكن أن تزيد مدة الإصابة بالسكري عن عمر المريض.'));
  const medical=readMedicalFields(form);
  if(medical.history.length>1500||medical.otherDiagnoses.length>500||medical.medications.length>1600)throw Error(t('Clinical text exceeds permitted limits.','النص السريري أطول من الحد المسموح.'));
  const clinicCode=clinicKey(),patientId=clinicCode+'_'+id;
