@@ -4,6 +4,7 @@ import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmail
 import{getFirestore,doc,getDoc,getDocs,collection,query,where,setDoc,updateDoc,writeBatch,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import{firebaseConfig}from'./firebase-config.js';
 import{downloadClinicTemplate,readClinicTemplate}from'./excel-lite.js?v=20261014-excel-fix-v4';
+import{STUDY_PHASES,STUDY_MEASURES,validDate,evaluatePatient,aggregateStudy,patientTrendMarkup,patientQualityMarkup,reportHtml,qualityCsv,clinicSummaryCsv}from'./study-analytics.js?v=20261015-report-v1';
 
 const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
 const ADMIN_EMAIL='medicaldepartmentdad@gmail.com';
@@ -76,7 +77,7 @@ async function login(username,password,admin){
 }
 function renderNav(){
  const links=isAdmin()?[
- ['overview',t('Overview','نظرة عامة')],['clinics',t('Clinics','العيادات')],['patients',t('Study records','سجلات الدراسة')],['users',t('Users','المستخدمون')],['settings',t('Settings','الإعدادات')],['qr','QR Code']]:
+ ['overview',t('Overview','نظرة عامة')],['clinics',t('Clinics','العيادات')],['patients',t('Study records','سجلات الدراسة')],['users',t('Users','المستخدمون')],['reports',t('Reports & quality','التقارير والجودة')],['settings',t('Settings','الإعدادات')],['qr','QR Code']]:
  [['patients',t('Study records','سجلات الدراسة')],['contact',t('Contact Us','اتصل بنا')]];
  $('nav').innerHTML=links.map(([key,name])=>'<button type="button" data-nav="'+key+'" class="'+(current.view===key?'active':'')+'">'+esc(name)+'</button>').join('');
 }
@@ -87,13 +88,13 @@ function render(){
  if(!isAuthorized())return;
  renderNav();
  $('scopeCaption').textContent=isAdmin()?t('STUDY OVERSIGHT','الإشراف على الدراسة'):t('PARTICIPATING CLINIC','العيادة المشاركة');
- const label={overview:t('Study overview','نظرة عامة على الدراسة'),clinics:t('Participating clinics','العيادات المشاركة'),patients:t('Patient records','سجلات المرضى'),users:t('Access management','إدارة المستخدمين'),settings:t('Study settings','إعدادات الدراسة'),qr:'QR Code',account:t('My account','حسابي'),contact:t('Contact Us','اتصل بنا')};
+ const label={overview:t('Study overview','نظرة عامة على الدراسة'),clinics:t('Participating clinics','العيادات المشاركة'),patients:t('Patient records','سجلات المرضى'),users:t('Access management','إدارة المستخدمين'),reports:t('Study reports & data quality','تقارير الدراسة وجودة البيانات'),settings:t('Study settings','إعدادات الدراسة'),qr:'QR Code',account:t('My account','حسابي'),contact:t('Contact Us','اتصل بنا')};
  $('sectionTitle').textContent=label[current.view]||label.overview;
  $('sectionSub').textContent=isAdmin()?t('Authorized medical affairs workspace','مساحة الإشراف الطبي المخوّلة'):
    (current.clinics.find(c=>c.id===clinicKey())?.doctorName||clinicKey());
  $('roleBadge').textContent=isAdmin()?t('Study administrator','مسؤول الدراسة'):t('Clinic account','حساب العيادة');
  if(!current.ready){$('view').innerHTML=panel(t('Connecting to study database','جارٍ الاتصال بقاعدة بيانات الدراسة'),'<p>'+t('Clinical functions remain unavailable until the database permission checks complete.','تبقى الوظائف السريرية غير متاحة حتى يكتمل التحقق من صلاحيات قاعدة البيانات.')+'</p>');return;}
- const views={overview:overview,clinics:clinicsView,patients:patientsView,users:usersView,settings:settingsView,qr:qrView,account:accountView,contact:contactView};
+ const views={overview:overview,clinics:clinicsView,patients:patientsView,users:usersView,reports:reportsView,settings:settingsView,qr:qrView,account:accountView,contact:contactView};
  $('view').innerHTML=(views[current.view]||overview)();
  if(current.view==='qr')setTimeout(renderQR,0);
  if(current.view==='patients'&&current.patient){const p=current.patients.find(x=>x.id===current.patient);if(p)showVisits(p)}
@@ -106,7 +107,7 @@ function overview(){
  panel(t('Research data workspace','مساحة بيانات الدراسة'),
  '<p class="muted">'+t('All clinical records here are retrieved from Firestore. Access to each clinic is restricted by database authorization rules.','تُقرأ سجلات الدراسة مباشرة من Firestore، وتُفرض صلاحيات كل عيادة من قواعد قاعدة البيانات.')+'</p>'+
  '<div class="actions"><button class="cta" data-nav="patients">'+t('Open study records','فتح سجلات الدراسة')+'</button>'+
- (isAdmin()?'<button class="secondary" data-nav="clinics">'+t('Clinic roster','قائمة العيادات')+'</button>':'')+'</div>')+
+ (isAdmin()?'<button class="secondary" data-nav="clinics">'+t('Clinic roster','قائمة العيادات')+'</button><button class="secondary" data-nav="reports">'+t('Study reports','تقارير الدراسة')+'</button>':'')+'</div>')+
  panel(t('Data protection','حماية البيانات'),'<div class="security-note">'+t('Use coded study IDs only. Do not enter patient names, civil IDs, telephone numbers or other direct identifiers. Follow your approved protocol, ethics, privacy and pharmacovigilance procedures.','استخدم رموز مرضى الدراسة فقط. يمنع إدخال أسماء المرضى أو الأرقام الوطنية أو الهواتف أو أي معرف مباشر. يجب الالتزام بالبروتوكول المعتمد وإجراءات الأخلاقيات والخصوصية واليقظة الدوائية.')+'</div>');
 }
 const CLINIC_PATIENT_TARGET=20;
@@ -300,10 +301,105 @@ function patientView(p){
  '<div class="grid">'+metric(t('Age','العمر'),esc(p.age))+
  metric(t('Recorded study visits','الزيارات المسجّلة'),'<span id="patientVisitCount">…</span>')+'</div>'+
  clinicalProfile+
+ panel(t('Clinical trends · Baseline to follow-ups','الرسوم البيانية · من الأساسية إلى المتابعات'),
+ '<p class="muted">'+t('Recorded HbA1c, fasting glucose, eGFR and weight across the three study visits.','HbA1c والسكر الصائم وeGFR والوزن عبر زيارات الدراسة الثلاث.')+'</p>'+
+ '<div id="patientTrends">'+t('Loading charts…','جارٍ تحميل الرسوم…')+'</div>')+
+ panel(t('Data quality · patient record','جودة البيانات · ملف المريض'),
+ '<div id="patientQuality">'+t('Checking data completeness…','جارٍ فحص اكتمال البيانات…')+'</div>')+
  panel(t('Visit history · Baseline & follow-ups','سجل الزيارات · Baseline والمتابعات'),
  '<p class="muted">'+t('Open each visit to review its clinical values, therapy changes, newly diagnosed diseases, adverse events and notes.','افتح أي زيارة لمراجعة نتائجها السريرية وتغييرات الأدوية والتشخيصات الجديدة والأحداث الضارة والملاحظات.')+'</p>'+
  '<div id="visitsArea" class="visit-history">'+t('Loading patient visit history…','جارٍ تحميل سجل زيارات المريض…')+'</div>'+
  '<div class="security-note">'+t('Safety entries here do not replace formal pharmacovigilance reporting.','تسجيل الأحداث الضارة هنا لا يحل محل إجراءات الإبلاغ الرسمية لليقظة الدوائية.')+'</div>');
+}
+function reportsView(){
+ if(!isAdmin())return panel(t('Restricted','غير مصرح'),t('Administrator access required.','يتطلب صلاحية الأدمن.'));
+ const clinicCounts=current.clinics.map(c=>({id:c.id,n:current.patients.filter(p=>p.clinicCode===c.id).length}));
+ const total=current.patients.length,target=current.clinics.length*20;
+ return '<div class="reports-hero"><div><div class="report-eyebrow">'+t('GLENPA REAL · EVIDENCE WORKSPACE','GLENPA REAL · مساحة الدراسة')+'</div>'+
+ '<h2>'+t('Study reporting, ready in one click','تقارير الدراسة جاهزة بضغطة زر')+'</h2>'+
+ '<p>'+t('Generate descriptive results directly from Firestore. Downloads contain no patient names or direct identifiers.','أنشئ تقارير وصفية من بيانات Firestore الفعلية. التنزيلات لا تحتوي أسماء المرضى أو معرّفاتهم الشخصية.')+'</p></div>'+
+ '<div class="report-enrollment-pill"><strong>'+total+' / '+target+'</strong><span>'+t('enrolled patients / total target','مريض مسجل / إجمالي المستهدف')+'</span></div></div>'+
+ '<div class="report-action-grid">'+
+ '<article><div class="report-action-icon" aria-hidden="true">▤</div><h3>'+t('Study summary report','التقرير الشامل للدراسة')+'</h3>'+
+ '<p>'+t('By-clinic enrollment, visit completion, measured outcomes, sample sizes and data-quality overview.','التسجيل لكل عيادة، اكتمال الزيارات، المؤشرات السريرية وأعداد القياسات وملخص جودة البيانات.')+'</p>'+
+ '<button id="downloadStudyReport" class="cta" type="button">'+t('Download study report','تنزيل تقرير الدراسة')+'</button></article>'+
+ '<article><div class="report-action-icon" aria-hidden="true">✓</div><h3>'+t('Data quality review','مراجعة جودة البيانات')+'</h3>'+
+ '<p>'+t('Scan saved patient visits for missing values, date inconsistencies and unusual measurements.','فحص السجلات للكشف عن القيم الناقصة وتعارض التواريخ والقياسات التي تستدعي المراجعة.')+'</p>'+
+ '<button id="runStudyQuality" class="secondary" type="button">'+t('Check data quality','فحص جودة البيانات')+'</button> '+
+ '<button id="downloadQualityCsv" class="secondary" type="button">'+t('Download quality CSV','تنزيل CSV للجودة')+'</button></article>'+
+ '<article><div class="report-action-icon" aria-hidden="true">↗</div><h3>'+t('Clinic performance data','بيانات أداء العيادات')+'</h3>'+
+ '<p>'+t('Download enrollment progress out of 20 and visit counts per clinic as a spreadsheet-ready CSV.','تنزيل أعداد التسجيل من 20 وأعداد الزيارات لكل عيادة بملف CSV قابل للفتح في Excel.')+'</p>'+
+ '<button id="downloadClinicSummary" class="secondary" type="button">'+t('Download clinic summary','تنزيل ملخص العيادات')+'</button></article></div>'+
+ '<p id="reportRunStatus" class="report-run-status" aria-live="polite">'+
+ t('No report generated yet. The latest saved visit records will be loaded when you click a report button.','لم يُنشأ تقرير بعد. تُحمّل أحدث سجلات الزيارات المحفوظة عند طلب التقرير.')+'</p>'+
+ '<div id="studyQualityResults"></div>'+
+ '<div class="security-note">'+t('These outputs are descriptive, not validated statistical analyses or a substitute for clinical and pharmacovigilance review.','هذه تقارير وصفية وليست تحليلات إحصائية معتمدة أو بديلًا عن المراجعة السريرية واليقظة الدوائية.')+'</div>';
+}
+function studyQualityView(stats){
+ const q=stats.quality;
+ const topIssues=new Map();
+ for(const item of q.issues){
+  const key=item.code+'|'+(current.language==='ar'?item.ar:item.en);
+  const entry=topIssues.get(key)||{label:current.language==='ar'?item.ar:item.en,count:0,severity:item.severity};
+  entry.count++;topIssues.set(key,entry);
+ }
+ const listing=[...topIssues.values()].sort((a,b)=>b.count-a.count).slice(0,14);
+ return '<div class="quality-dashboard"><h3>'+t('Quality results for saved records','نتائج الجودة للسجلات المحفوظة')+'</h3>'+
+ '<div class="grid">'+metric(t('Records needing review','سجلات تحتاج مراجعة'),q.recordsNeedingAttention)+
+ metric(t('Data errors','أخطاء البيانات'),q.errors)+metric(t('Review warnings','تنبيهات المراجعة'),q.warnings)+
+ metric(t('Missing / notes','النواقص والملاحظات'),q.notices)+'</div>'+
+ (listing.length?'<div class="table-scroll"><table><thead><tr><th>'+t('Finding','الملاحظة')+'</th><th>'+t('Affected fields or visits','عدد الحالات')+'</th></tr></thead><tbody>'+
+ listing.map(x=>'<tr><td>'+esc(x.label)+'</td><td><b>'+x.count+'</b></td></tr>').join('')+'</tbody></table></div>':
+ '<p class="dq-clean">'+t('No issues were found by the automated checks.','لم ترصد الفحوصات الآلية أي مشاكل.')+'</p>')+'</div>';
+}
+function downloadTextFile(content,filename,mime){
+ const blob=new Blob([content],{type:mime}),url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+async function gatherStudyReport(){
+ if(!isAdmin())throw Error('Study reports require administrator access.');
+ // Visit subcollections are queried by patient; no broad public collectionGroup rules required.
+ const patients=current.patients.slice();
+ const visits=new Map(),total=patients.length;let completed=0,next=0;
+ const progress=$('reportRunStatus');
+ const notice=()=>{if(progress)progress.textContent=t('Reading study visits ','جارٍ قراءة الزيارات ')+completed+' / '+total;};
+ notice();
+ const workers=Array.from({length:Math.min(8,total)},async()=>{
+  while(next<total){
+   const index=next++,p=patients[index];
+   const snap=await getDocs(collection(db,'patients',p.id,'visits'));
+   visits.set(p.id,new Map(snap.docs.map(v=>[v.id,v.data()])));
+   completed++;if(completed%5===0||completed===total)notice();
+  }
+ });
+ await Promise.all(workers);
+ // Fail closed if any patient visit collection cannot be fetched.
+ if(visits.size!==total)throw Error(t('Incomplete visit retrieval; report was not generated.','لم يكتمل تحميل الزيارات؛ لم يتم إنشاء التقرير.'));
+ const stats=aggregateStudy(patients,visits,current.clinics);
+ current.reportSnapshot=stats;
+ return stats;
+}
+async function runStudyReport(kind){
+ if(!isAdmin())return;
+ const statusEl=$('reportRunStatus');
+ if(statusEl)statusEl.textContent=t('Preparing the latest coded study data…','جارٍ تجهيز أحدث بيانات الدراسة المرمّزة…');
+ const stats=kind==='clinics'?
+  aggregateStudy(current.patients,new Map(),current.clinics):await gatherStudyReport();
+ const stamp=new Date().toISOString().slice(0,10);
+ if(kind==='html'){
+  downloadTextFile(reportHtml(stats,{ar:current.language==='ar'}),'GLENPA-REAL-Study-Report-'+stamp+'.html','text/html;charset=utf-8');
+ }else if(kind==='quality'){
+  const place=$('studyQualityResults');
+  if(place)place.innerHTML=studyQualityView(stats);
+ }else if(kind==='issues'){
+  downloadTextFile(qualityCsv(stats),'GLENPA-REAL-Data-Quality-'+stamp+'.csv','text/csv;charset=utf-8');
+ }else if(kind==='clinics'){
+  downloadTextFile(clinicSummaryCsv(stats),'GLENPA-REAL-Clinic-Summary-'+stamp+'.csv','text/csv;charset=utf-8');
+ }
+ if(statusEl)statusEl.textContent=t('Report generated from saved Firestore records. Patients: ','تم إنشاء التقرير من سجلات Firestore المحفوظة. المرضى: ')+stats.enrolled+
+   (kind==='clinics'?'':t(' · reviewed issues: ',' · ملاحظات الجودة: ')+stats.quality.issues.length)+
+   t('. Names are excluded.','. الأسماء غير مضمّنة.');
 }
 function usersView(){
  if(!isAdmin())return '';
@@ -501,6 +597,8 @@ async function showVisits(patient){
   if(current.patient!==patient.id||current.view!=='patients'||!$('visitsArea'))return;
   const records=new Map(result.docs.map(d=>[d.id,d.data()]));
   current.visitDocs=records;
+  if($('patientTrends'))$('patientTrends').innerHTML=patientTrendMarkup(records,{ar:current.language==='ar'});
+  if($('patientQuality'))$('patientQuality').innerHTML=patientQualityMarkup(patient,records,{ar:current.language==='ar'});
   const n=VISIT_PHASES.filter(phase=>records.has(phase)).length;
   if($('patientVisitCount'))$('patientVisitCount').textContent=n+' / 3';
   const canWrite=isClinic()&&patient.clinicCode===clinicKey();
@@ -531,6 +629,8 @@ async function showVisits(patient){
  }catch(err){
   const target=$('visitsArea');
   if(target&&current.patient===patient.id)target.textContent=errorMessage(err);
+  if($('patientTrends'))$('patientTrends').textContent=t('Charts cannot load until the patient visits are available.','لا يمكن عرض الرسوم قبل تحميل الزيارات.');
+  if($('patientQuality'))$('patientQuality').textContent=t('Quality assessment unavailable while visits cannot load.','تقييم الجودة غير متاح أثناء تعذر تحميل الزيارات.');
  }
 }
 function openEnrollForm(){
@@ -871,6 +971,10 @@ async function handleClick(e){
   return;
  }
  const toggle=e.target.closest('[data-toggleuser]');if(toggle){if(!isAdmin())return;const u=current.users.find(x=>x.id===toggle.dataset.toggleuser);if(!u||u.id===current.user.uid)return;await safeAction(async()=>{await updateDoc(doc(db,'userProfiles',u.id),{active:!u.active});await loadRecords()});return}
+ if(e.target.id==='downloadStudyReport'){await safeAction(()=>runStudyReport('html'));return}
+ if(e.target.id==='runStudyQuality'){await safeAction(()=>runStudyReport('quality'));return}
+ if(e.target.id==='downloadQualityCsv'){await safeAction(()=>runStudyReport('issues'));return}
+ if(e.target.id==='downloadClinicSummary'){await safeAction(()=>runStudyReport('clinics'));return}
  if(e.target.id==='refreshClinicProgress'){if(isAdmin())await safeAction(loadRecords);return}
  if(e.target.id==='downloadClinicXlsx'){if(isAdmin())downloadClinicTemplate();return}
  if(e.target.id==='importClinicWorkbook'){await safeAction(importClinicWorkbook);return}
