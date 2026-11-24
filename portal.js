@@ -20,6 +20,9 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const t=(en,ar)=>current.language==='ar'?ar:en;
 const isAdmin=()=>current.profile?.role==='study_oversight';
 const clinicKey=()=>current.profile?.clinicCode||'';
+const isDemo=()=>clinicKey()==='clinicdemo';
+const patientCollection=()=>isDemo()?'demoPatients':'patients';
+const directoryCollection=()=>isDemo()?'demoPatientDirectory':'patientDirectory';
 const isClinic=()=>current.profile?.role==='clinic';
 const isAuthorized=()=>current.user&&current.profile?.active===true&&(isAdmin()||isClinic());
 const parseCode=s=>String(s||'').toLowerCase().trim();
@@ -368,7 +371,7 @@ async function gatherStudyReport(){
  const workers=Array.from({length:Math.min(8,total)},async()=>{
   while(next<total){
    const index=next++,p=patients[index];
-   const snap=await getDocs(collection(db,'patients',p.id,'visits'));
+   const snap=await getDocs(collection(db,patientCollection(),p.id,'visits'));
    visits.set(p.id,new Map(snap.docs.map(v=>[v.id,v.data()])));
    completed++;if(completed%5===0||completed===total)notice();
   }
@@ -480,13 +483,13 @@ async function loadRecords(){
  try{
   const cs=isAdmin()?await getDocs(collection(db,'clinics')):null;
   const own=isClinic()?await getDoc(doc(db,'clinics',clinicKey())):null;
-  current.clinics=isAdmin()?cs.docs.map(d=>({id:d.id,...d.data()})):own?.exists()?[{id:own.id,...own.data()}]:[];
+  current.clinics=isAdmin()?cs.docs.filter(d=>d.id!=='clinicdemo').map(d=>({id:d.id,...d.data()})):own?.exists()?[{id:own.id,...own.data()}]:[];
   current.clinics.sort((a,b)=>a.id.localeCompare(b.id));
-  const ps=isAdmin()?await getDocs(collection(db,'patients')):await getDocs(query(collection(db,'patients'),where('clinicCode','==',clinicKey())));
+  const ps=isAdmin()?await getDocs(collection(db,patientCollection())):await getDocs(query(collection(db,patientCollection()),where('clinicCode','==',clinicKey())));
   current.patients=ps.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
   if(isClinic()){
    try{
-    const directory=await getDocs(query(collection(db,'patientDirectory'),where('clinicCode','==',clinicKey())));
+    const directory=await getDocs(query(collection(db,directoryCollection()),where('clinicCode','==',clinicKey())));
     current.patientNames=new Map(directory.docs.map(d=>[d.id,d.data()]));
     current.nameDirectoryReady=true;
    }catch(error){
@@ -496,7 +499,7 @@ async function loadRecords(){
   }else{current.patientNames=new Map();current.nameDirectoryReady=false;}
   try{const settings=await getDoc(doc(db,'siteSettings','main'));current.settings=settings.exists()?settings.data():{studyTitle:'GLENPA REAL',enrollmentEnabled:false}}catch(e){current.settings={studyTitle:'GLENPA REAL',enrollmentEnabled:false}}
   if(isAdmin()){
-   const users=await getDocs(collection(db,'userProfiles'));current.users=users.docs.map(d=>({id:d.id,...d.data()}));
+   const users=await getDocs(collection(db,'userProfiles'));current.users=users.docs.filter(d=>d.data().clinicCode!=='clinicdemo').map(d=>({id:d.id,...d.data()}));
   }
   current.ready=true;status('');render();
  }catch(e){
@@ -548,11 +551,11 @@ async function enrollPatient(form){
   createdBy:current.user.uid,createdAt:serverTimestamp()};
  // Atomic write: both the patient profile and baseline must succeed together.
  const batch=writeBatch(db);
- batch.set(doc(db,'patients',patientId),payload);
- batch.set(doc(db,'patientDirectory',patientId),{
+ batch.set(doc(db,patientCollection(),patientId),payload);
+ batch.set(doc(db,directoryCollection(),patientId),{
   clinicCode,firstName,lastName,createdBy:current.user.uid,createdAt:serverTimestamp()
  });
- batch.set(doc(db,'patients',patientId,'visits','baseline'),baseline);
+ batch.set(doc(db,patientCollection(),patientId,'visits','baseline'),baseline);
  await batch.commit();
  current.patient=patientId;current.view='patients';
  await loadRecords();
@@ -564,7 +567,7 @@ async function updateMedicalProfile(form,patient){
  if(!eligiblePatientWrite(patient))throw Error(t('Only the assigned clinic may edit medical history.','العيادة المسؤولة فقط يمكنها تعديل التاريخ المرضي.'));
  const medical=readMedicalFields(form);
  if(medical.history.length>1500||medical.otherDiagnoses.length>500||medical.medications.length>1600)throw Error(t('Clinical text exceeds permitted limits.','النص السريري أطول من الحد المسموح.'));
- await updateDoc(doc(db,'patients',patient.id),{...medical,updatedBy:current.user.uid,updatedAt:serverTimestamp()});
+ await updateDoc(doc(db,patientCollection(),patient.id),{...medical,updatedBy:current.user.uid,updatedAt:serverTimestamp()});
  current.patient=patient.id;current.view='patients';
  await loadRecords();
  status(t('Medical history and medicines saved. Previous visits remain unchanged.','تم حفظ التاريخ المرضي والأدوية دون تغيير الزيارات السابقة.'));
@@ -575,7 +578,7 @@ async function saveVisit(form,patient){
  const phase=String(new FormData(form).get('phase')||'');
  if(!VISIT_PHASES.includes(phase))throw Error('Invalid phase');
  const prior=phase==='month3'?'baseline':phase==='month6'?'month3':null;
- const existing=await getDocs(collection(db,'patients',patient.id,'visits'));
+ const existing=await getDocs(collection(db,patientCollection(),patient.id,'visits'));
  if(existing.docs.some(v=>v.id===phase))throw Error(t('This visit has already been saved.','هذه الزيارة مسجّلة مسبقًا.'));
  const previous=prior?existing.docs.find(v=>v.id===prior):null;
  if(prior&&!previous)throw Error(t('Save the previous visit first.','يجب حفظ الزيارة السابقة أولًا.'));
@@ -586,7 +589,7 @@ async function saveVisit(form,patient){
   prevDate.setUTCMonth(prevDate.getUTCMonth()+3);
   if(visit.date<prevDate.toISOString().slice(0,10))throw Error(t('Follow-up is due at least 3 calendar months after the previous visit.','تُسجل المتابعة بعد 3 أشهر تقويمية على الأقل من الزيارة السابقة.'));
  }
- await setDoc(doc(db,'patients',patient.id,'visits',phase),visit);
+ await setDoc(doc(db,patientCollection(),patient.id,'visits',phase),visit);
  render();await showVisits(patient);
  status(t('Visit saved in the patient history.','تم حفظ الزيارة في سجل المريض.'));
 }
@@ -594,7 +597,7 @@ async function showVisits(patient){
  const container=$('visitsArea');
  if(!container||current.patient!==patient.id)return;
  try{
-  const result=await getDocs(collection(db,'patients',patient.id,'visits'));
+  const result=await getDocs(collection(db,patientCollection(),patient.id,'visits'));
   if(current.patient!==patient.id||current.view!=='patients'||!$('visitsArea'))return;
   const records=new Map(result.docs.map(d=>[d.id,d.data()]));
   current.visitDocs=records;
@@ -723,7 +726,7 @@ async function savePatientName(form){
  const firstName=String(data.get('firstName')||'').trim(),lastName=String(data.get('lastName')||'').trim();
  const pat=/^[\p{L}][\p{L}\p{M}'-]{1,59}$/u;
  if(!pat.test(firstName)||!pat.test(lastName))throw Error(t('Name must be two separate parts.','يجب أن يكون الاسم من مقطعين: اسم أول واسم عائلة.'));
- const reference=doc(db,'patientDirectory',patient.id),existing=current.patientNames.get(patient.id);
+ const reference=doc(db,directoryCollection(),patient.id),existing=current.patientNames.get(patient.id);
  if(existing){
   await updateDoc(reference,{firstName,lastName,updatedBy:current.user.uid,updatedAt:serverTimestamp()});
  }else{
@@ -909,7 +912,7 @@ async function exportCodedCSV(){
    'visit','visitDate','hba1c','fpg','egfr','weight','dose','adverseEvent','medicationChanges','newDiagnoses','clinicalNotes'];
  const rows=[cols];
  for(const p of current.patients){
-  const visits=await getDocs(collection(db,'patients',p.id,'visits'));
+  const visits=await getDocs(collection(db,patientCollection(),p.id,'visits'));
   const shared=[p.clinicCode,p.patientCode,p.age,p.sex,p.diabetesYears,p.history,
    Array.isArray(p.diagnoses)?p.diagnoses.join('; '):'',p.otherDiagnoses,medicationLines(p).replace(/\r?\n/g,'; ')];
   if(visits.empty){rows.push([...shared,...Array(cols.length-shared.length).fill('')]);continue}
@@ -1056,7 +1059,7 @@ onAuthStateChanged(auth,async user=>{
   const profile=await getDoc(doc(db,'userProfiles',user.uid));
   if(!profile.exists())throw Error('No study access profile has been provisioned for this account.');
   const p=profile.data();
-  if(p.active!==true||!['clinic','study_oversight'].includes(p.role)||p.role==='clinic'&&!validClinic(p.clinicCode)||p.role==='study_oversight'&&p.username!=='msl.admin')throw Error('Inactive or invalid study access profile.');
+  if(p.active!==true||!['clinic','study_oversight'].includes(p.role)||p.role==='clinic'&&!(validClinic(p.clinicCode)||(p.clinicCode==='clinicdemo'&&p.username==='clinicdemo'&&user.uid==='mvASWRzeXQSUKtbAfZ7oXdPuAY62'))||p.role==='study_oversight'&&p.username!=='msl.admin')throw Error('Inactive or invalid study access profile.');
   // Dedicated administrator route. Do not mix clinic and admin navigation.
   if(p.role==='study_oversight'&&!ADMIN_PAGE){window.location.replace('./admin.html');return}
   if(p.role==='clinic'&&ADMIN_PAGE){window.location.replace('./index.html');return}
