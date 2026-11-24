@@ -182,3 +182,10 @@ details.visit-card summary:focus-visible{outline:2px solid var(--primary);outlin
 .quality-dashboard .grid{margin:12px 0 20px}
 @media(max-width:900px){.report-action-grid{grid-template-columns:1fr}.report-action-grid p{min-height:0}}
 @media(max-width:720px){.trend-chart-grid{grid-template-columns:1fr}.reports-hero{flex-direction:column;align-items:stretch;padding:23px}.report-enrollment-pill{min-width:0}}
+
+/* Clinic dark theme: maintain readable text on light wizard and search fields. */
+[data-theme="dark"] body[data-portal="clinic"] .wizard-step :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea),
+[data-theme="dark"] body[data-portal="clinic"] .patient-search input,
+body[data-portal="clinic"][data-theme="dark"] .wizard-step :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea),
+body[data-portal="clinic"][data-theme="dark"] .patient-search input {background-color:#fff;color:#132936;caret-color:#132936;color-scheme:light;}
+body[data-portal="clinic"] .wizard-step :is(input,textarea)::placeholder,body[data-portal="clinic"] .patient-search input::placeholder {color:#64748b;opacity:1;}
